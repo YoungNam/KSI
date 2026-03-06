@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   RadialBarChart,
   RadialBar,
@@ -15,6 +15,7 @@ import {
   Wifi,
   WifiOff,
   Activity,
+  Star,
 } from "lucide-react";
 import {
   Card,
@@ -30,6 +31,8 @@ import {
   getPhaseColor,
   formatDateKo,
 } from "@/lib/utils";
+import { supabase, WatchlistItem } from "@/lib/supabase";
+import { fetchStockPrice, StockPrice } from "@/lib/api";
 
 /* ────────────────────────────────────────────────────────────
    로딩 스켈레톤 — 펄스 애니메이션
@@ -353,6 +356,175 @@ function ErrorBanner({ message }: { message: string }) {
 }
 
 /* ────────────────────────────────────────────────────────────
+   관심종목 아이템 스켈레톤 — 로딩 중 펄스 애니메이션
+   ──────────────────────────────────────────────────────────── */
+function WatchlistSkeletonItem() {
+  return (
+    <div className="flex items-center justify-between py-3 border-b border-[#242D3D] last:border-b-0">
+      {/* 왼쪽: 종목명 + 티커 */}
+      <div className="space-y-1.5">
+        <div className="h-3.5 bg-[#1E2535] rounded-full w-24 animate-pulse" />
+        <div className="h-3 bg-[#1E2535] rounded-full w-16 animate-pulse" />
+      </div>
+      {/* 오른쪽: 현재가 + 등락률 */}
+      <div className="text-right space-y-1.5">
+        <div className="h-3.5 bg-[#1E2535] rounded-full w-20 animate-pulse ml-auto" />
+        <div className="h-3 bg-[#1E2535] rounded-full w-14 animate-pulse ml-auto" />
+      </div>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────
+   관심종목 현황 섹션
+   - Supabase watchlist 테이블에서 목록 조회
+   - fetchStockPrice(ticker, 1)로 현재가 병렬 조회
+   - 에러 발생 시 조용히 무시 (대시보드 전체에 영향 없도록)
+   ──────────────────────────────────────────────────────────── */
+
+/** 관심종목 + 현재가 결합 타입 */
+interface WatchlistWithPrice extends WatchlistItem {
+  priceData: StockPrice | null;
+}
+
+function WatchlistSection() {
+  // 관심종목 + 가격 데이터 상태
+  const [items, setItems] = useState<WatchlistWithPrice[]>([]);
+  // 로딩 상태 (초기 true)
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadWatchlist() {
+      try {
+        // 1단계: Supabase watchlist 테이블에서 관심종목 목록 조회
+        const { data: watchlistRows, error } = await supabase
+          .from("watchlist")
+          .select("*")
+          .order("added_at", { ascending: false });
+
+        // 에러 발생 시 조용히 종료 (대시보드 전체에 영향 없음)
+        if (error || !watchlistRows || watchlistRows.length === 0) {
+          setItems([]);
+          setLoading(false);
+          return;
+        }
+
+        // 2단계: 각 종목의 현재가를 Promise.all로 병렬 조회 (days=1)
+        const priceResults = await Promise.all(
+          watchlistRows.map(async (item: WatchlistItem) => {
+            try {
+              const priceData = await fetchStockPrice(item.ticker, 1);
+              return { ...item, priceData };
+            } catch {
+              // 개별 종목 가격 조회 실패 시 null 처리 (나머지 종목에 영향 없음)
+              return { ...item, priceData: null };
+            }
+          })
+        );
+
+        setItems(priceResults);
+      } catch {
+        // 전체 조회 실패 시 빈 배열로 조용히 처리
+        setItems([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadWatchlist();
+  }, []);
+
+  return (
+    <div className="rounded-2xl border border-[#242D3D] bg-[#161B27] p-6 shadow-[0_2px_12px_rgba(0,0,0,0.3)]">
+      {/* 섹션 헤더 */}
+      <div className="flex items-center gap-2 mb-5">
+        <Star className="w-4 h-4 text-[#F5A623]" />
+        <h2 className="text-sm font-semibold text-[#8B96A9] uppercase tracking-wide">
+          관심종목 현황
+        </h2>
+      </div>
+
+      {/* 로딩 스켈레톤 */}
+      {loading && (
+        <div>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <WatchlistSkeletonItem key={i} />
+          ))}
+        </div>
+      )}
+
+      {/* 관심종목 없음 안내 */}
+      {!loading && items.length === 0 && (
+        <div className="py-8 text-center">
+          <Star className="w-8 h-8 text-[#242D3D] mx-auto mb-3" />
+          <p className="text-sm text-[#4E5C72]">
+            등록된 관심종목이 없습니다.
+          </p>
+          <p className="text-xs text-[#4E5C72] mt-1">
+            <a
+              href="/watchlist"
+              className="text-[#3182F6] hover:underline underline-offset-2"
+            >
+              관심종목 페이지
+            </a>
+            를 방문하여 종목을 추가하세요.
+          </p>
+        </div>
+      )}
+
+      {/* 관심종목 목록 */}
+      {!loading && items.length > 0 && (
+        <div>
+          {items.map((item) => {
+            // 현재가 및 등락률 추출 (가격 데이터 없으면 대시 표시)
+            const price = item.priceData?.current_price ?? null;
+            const changeRate = item.priceData?.change_rate ?? null;
+            const colorClass =
+              changeRate !== null ? getChangeColor(changeRate) : "text-[#8B96A9]";
+
+            return (
+              <div
+                key={item.id}
+                className="flex items-center justify-between py-3 border-b border-[#242D3D] last:border-b-0 hover:bg-[#1E2535]/50 -mx-2 px-2 rounded-lg transition-colors duration-150 cursor-pointer"
+                onClick={() => window.location.href = `/stock/${item.ticker}`}
+              >
+                {/* 왼쪽: 종목명 + 시장 배지 */}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-[#F0F4FF] truncate">
+                      {item.alias ?? item.name}
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] px-1.5 py-0 border-[#242D3D] text-[#8B96A9] shrink-0"
+                    >
+                      {item.market}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-[#4E5C72] mt-0.5 tabular-nums">
+                    {item.ticker}
+                  </p>
+                </div>
+
+                {/* 오른쪽: 현재가 + 등락률 */}
+                <div className="text-right shrink-0 ml-4">
+                  <p className="text-sm font-bold text-[#F0F4FF] tabular-nums">
+                    {price !== null ? `${formatNumber(price)}원` : "—"}
+                  </p>
+                  <p className={`text-xs font-semibold tabular-nums mt-0.5 ${colorClass}`}>
+                    {changeRate !== null ? formatChange(changeRate) : "—"}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────
    대시보드 메인 페이지
    - useMarketRealtime 훅으로 Supabase Realtime 자동 갱신
    - Toss 금융 앱 스타일: 큰 숫자 중심 레이아웃
@@ -506,6 +678,9 @@ export default function DashboardPage() {
               indicators={data.indicators}
             />
           </div>
+
+          {/* ── 4행: 관심종목 현황 ── */}
+          <WatchlistSection />
         </div>
       )}
     </div>
