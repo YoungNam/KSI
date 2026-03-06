@@ -1,0 +1,26 @@
+# 웹 프레임워크
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+
+# 환경변수
+python-dotenv==1.0.1
+
+# 스케줄러
+apscheduler==3.10.4
+
+# 주식 데이터
+pykrx==1.0.47
+finance-datareader==0.9.66
+pandas==2.2.2
+numpy==1.26.4
+
+# Supabase
+supabase==2.7.4
+
+# AI
+anthropic==0.34.2
+google-generativeai==0.8.3
+
+# HTTP
+httpx==0.27.2
+requests==2.32.3

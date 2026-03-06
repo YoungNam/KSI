@@ -1,0 +1,182 @@
+/* Pretendard Variable 폰트 임포트 */
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* KSI Toss 디자인 시스템 — CSS 변수 정의 */
+@layer base {
+  :root {
+    /* 배경 레이어 */
+    --background: 220 25% 7%;        /* #0E1117 — 최심층 배경 */
+    --foreground: 220 50% 96%;       /* #F0F4FF — 1차 텍스트 */
+
+    /* 카드 레이어 */
+    --card: 222 24% 11%;             /* #161B27 — 카드 배경 */
+    --card-foreground: 220 50% 96%;
+    --card-hover: 220 22% 15%;       /* #1E2535 — 카드 hover */
+
+    /* 경계선 */
+    --border: 220 20% 17%;           /* #242D3D — subtle border */
+    --input: 220 20% 17%;
+    --ring: 214 91% 58%;             /* #3182F6 — Toss Blue */
+
+    /* Primary — Toss Blue */
+    --primary: 214 91% 58%;          /* #3182F6 */
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary */
+    --secondary: 220 22% 15%;        /* #1E2535 */
+    --secondary-foreground: 220 20% 67%; /* #8B96A9 */
+
+    /* Muted */
+    --muted: 220 20% 17%;            /* #242D3D */
+    --muted-foreground: 220 15% 55%; /* #8B96A9 */
+
+    /* Accent */
+    --accent: 220 22% 15%;
+    --accent-foreground: 220 50% 96%;
+
+    /* 상태 색상 */
+    --destructive: 356 87% 61%;      /* #F04452 — 하락/위험 */
+    --destructive-foreground: 0 0% 100%;
+    --success: 155 96% 38%;          /* #05C075 — 상승/성공 */
+    --warning: 37 91% 55%;           /* #F5A623 — 중립/경고 */
+
+    /* 보더 반경 */
+    --radius: 1rem;                  /* 16px — Toss 기본 */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    /* Pretendard 폰트 스택 적용 */
+    font-family: "Pretendard Variable", Pretendard, -apple-system,
+      BlinkMacSystemFont, system-ui, sans-serif;
+    font-feature-settings: "kern" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* 테이블형 숫자 정렬 — 가격, 등락률 등에 사용 */
+  .tabular-nums {
+    font-feature-settings: "tnum" 1, "kern" 1;
+  }
+}
+
+/* 커스텀 스크롤바 */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #242d3d;
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #4e5c72;
+}
+
+/* 마크다운 렌더링 스타일 — Toss 다크 테마 */
+.markdown-body {
+  color: #f0f4ff;
+  line-height: 1.75;
+}
+.markdown-body h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 1.5rem 0 0.75rem;
+  color: #f0f4ff;
+}
+.markdown-body h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 1.25rem 0 0.5rem;
+  color: #f0f4ff;
+  border-bottom: 1px solid #242d3d;
+  padding-bottom: 0.4rem;
+}
+.markdown-body h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 1rem 0 0.4rem;
+  color: #f0f4ff;
+}
+.markdown-body p {
+  margin: 0.5rem 0;
+  color: #b8c4d4;
+}
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.875rem;
+}
+.markdown-body th {
+  background: #1e2535;
+  color: #8b96a9;
+  font-weight: 600;
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid #242d3d;
+}
+.markdown-body td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #1e2535;
+  color: #b8c4d4;
+}
+.markdown-body tr:last-child td {
+  border-bottom: none;
+}
+.markdown-body ul,
+.markdown-body ol {
+  padding-left: 1.25rem;
+  margin: 0.5rem 0;
+}
+.markdown-body li {
+  color: #b8c4d4;
+  margin: 0.25rem 0;
+}
+.markdown-body blockquote {
+  border-left: 3px solid #3182f6;
+  padding-left: 1rem;
+  margin: 0.75rem 0;
+  color: #8b96a9;
+  font-style: italic;
+}
+.markdown-body code {
+  background: #1e2535;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  color: #4d95ff;
+}
+.markdown-body pre {
+  background: #1e2535;
+  padding: 1rem;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 0.75rem 0;
+}
+.markdown-body pre code {
+  background: transparent;
+  padding: 0;
+}
+.markdown-body hr {
+  border: none;
+  border-top: 1px solid #242d3d;
+  margin: 1.25rem 0;
+}
+.markdown-body strong {
+  font-weight: 700;
+  color: #f0f4ff;
+}

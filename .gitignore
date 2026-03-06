@@ -1,0 +1,46 @@
+# 환경변수 — 절대 커밋 금지
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# MCP 설정 (API 키 포함)
+.mcp.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+.next/
+out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 생성된 리포트 (로컬 캐시)
+backend/reports/
+
+# TypeScript 빌드 캐시
+*.tsbuildinfo
+
+# Claude Code 로컬 설정
+.claude/settings.local.json
