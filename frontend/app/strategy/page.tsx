@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
+import { WatchlistSection } from "@/components/watchlist-section";
 import {
   PieChart,
   Pie,
@@ -443,6 +444,9 @@ export default function StrategyPage() {
           </Card>
         </>
       )}
+
+      {/* 관심종목 현황 */}
+      <WatchlistSection />
     </div>
   );
 }

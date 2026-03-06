@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { WatchlistSection } from "@/components/watchlist-section";
 import { FileText, Play, RefreshCw, Clock } from "lucide-react";
 import {
   Card,
@@ -371,6 +372,9 @@ export default function ReportsPage() {
           일 4회 자동 생성 브리핑 (07:00 / 09:10 / 16:10 / 21:00)
         </p>
       </div>
+
+      {/* 관심종목 현황 */}
+      <WatchlistSection />
 
       {/* 메인 레이아웃: 탭 콘텐츠 + 사이드패널 */}
       <div className="flex flex-col lg:flex-row gap-6">
