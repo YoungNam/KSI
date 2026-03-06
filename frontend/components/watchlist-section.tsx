@@ -55,7 +55,7 @@ export function WatchlistSection() {
         const results = await Promise.all(
           rows.map(async (item: WatchlistItem) => {
             try {
-              const priceData = await fetchStockPrice(item.ticker, 1);
+              const priceData = await fetchStockPrice(item.ticker, 5);
               return { ...item, priceData };
             } catch {
               return { ...item, priceData: null };
