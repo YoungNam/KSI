@@ -1,0 +1,11 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "outputDirectory": ".next",
+  "env": {
+    "NEXT_PUBLIC_API_URL": "@ksi_api_url",
+    "NEXT_PUBLIC_SUPABASE_URL": "@ksi_supabase_url",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@ksi_supabase_anon_key"
+  }
+}
