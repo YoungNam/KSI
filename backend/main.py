@@ -40,8 +40,12 @@ _frontend_urls = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_frontend_urls,                # 운영 도메인 (환경변수)
-    allow_origin_regex=r"http://localhost:\d+",  # 개발: 모든 localhost 포트 허용
+    allow_origins=_frontend_urls,
+    allow_origin_regex=(
+        r"http://localhost:\d+"           # 개발: 모든 localhost 포트 허용
+        r"|https://.*\.vercel\.app"       # Vercel 배포 도메인 허용
+        r"|https://.*\.railway\.app"      # Railway 도메인 허용 (선택)
+    ),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
