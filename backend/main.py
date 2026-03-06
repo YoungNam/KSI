@@ -33,10 +33,15 @@ app = FastAPI(
 )
 
 # CORS 설정 (프론트엔드 허용)
+# FRONTEND_URL: 쉼표 구분으로 여러 도메인 지원 (예: "https://ksi.vercel.app,https://ksi.example.com")
+_frontend_urls = [
+    u.strip() for u in os.getenv("FRONTEND_URL", "").split(",") if u.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.getenv("FRONTEND_URL", "")],  # 운영 도메인
-    allow_origin_regex=r"http://localhost:\d+",      # 개발: 모든 localhost 포트 허용
+    allow_origins=_frontend_urls,                # 운영 도메인 (환경변수)
+    allow_origin_regex=r"http://localhost:\d+",  # 개발: 모든 localhost 포트 허용
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
