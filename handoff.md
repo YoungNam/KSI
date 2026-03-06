@@ -1,6 +1,6 @@
 # KSI Handoff — Korean Stock Intelligence
-> 마지막 업데이트: 2026-03-06
-> 상태: **개발 진행 중** — 백엔드 파이프라인 완성 / 프론트엔드 기본 구조 완성
+> 마지막 업데이트: 2026-03-07
+> 상태: **배포 완료** — Vercel (FE) + Railway (BE) 운영 중 / 코드 레벨 TODO 모두 완료
 
 ---
 
@@ -138,26 +138,28 @@ npm run dev   # localhost:3000
 
 ## 알려진 이슈 / TODO
 
-### 🔴 미완성 (우선순위 높음)
+### ✅ 완료된 항목 (2026-03-07)
 
-1. **`stock/[ticker]/page.tsx`**: 주가 차트가 목업 데이터 — `GET /api/v1/stocks/{ticker}/price` 엔드포인트 미구현
-2. **`watchlist/page.tsx`**: Supabase `watchlist` 테이블 미생성 — Supabase 대시보드에서 테이블 생성 필요
-3. **전략 페이지**: `short_term`, `mid_term` 구조가 백엔드 JSON 실제 필드(`period`, `approach`, `key_stocks`)와 프론트 예상 필드(`action`, `targets`)가 불일치
-4. **news_monitor**: Gemini API 키 미설정 시 뉴스 수집 불가 → `fetch_news()` 빈 리스트 반환 (파이프라인은 중단 없이 진행)
+1. **`stock/[ticker]/page.tsx`**: pykrx 실제 OHLCV 데이터 연동 완료 (`GET /api/v1/stocks/{ticker}/price`)
+2. **전략 페이지 필드 정렬**: `approach`, `key_stocks`, `POSITION_LABELS` 한국어 매핑 모두 구현됨
+3. **`stock_picker.py` fallback**: `_latest_trading_date()` — 장 마감·주말·공휴일 자동 전일 데이터 탐색
+4. **보고서 자동 갱신**: `fetchBriefingStatus` 5초 폴링 + `file_mtime` 비교로 완료 감지
+5. **Supabase 마이그레이션 SQL**: `001_create_tables.sql` + `002_schema_update.sql` 준비됨
+6. **배포**: Vercel (FE) + Railway (BE) 운영 중
 
-### 🟡 개선 필요 (우선순위 중간)
+### 🔴 운영 환경 설정 필요 (코드 변경 없음)
 
-5. **Supabase market_summary 테이블**: Realtime 연동을 위한 테이블 스키마 정의 및 생성 필요
-6. **`stock_picker.py`**: 장 마감·주말에는 pykrx가 당일 데이터 반환 불가 → 전일 데이터 fallback 로직 필요
-7. **`strategy/page.tsx`**: `position_weights` 키가 `aggressive/neutral/defensive`인데 차트에 그대로 노출 — 한국어 레이블 매핑 추가 필요
-8. **보고서 수동 실행 후 갱신**: `POST /briefing/run` 백그라운드 실행 완료 후 프론트에서 자동 갱신 없음 (현재 5초 딜레이 후 1회 재로드)
+1. **Supabase 테이블 생성**: Supabase 대시보드 > SQL Editor에서 아래 순서로 실행
+   - `backend/migrations/001_create_tables.sql`
+   - `backend/migrations/002_schema_update.sql`
+   - 이후 watchlist 테이블 Realtime 활성화 확인
+2. **Gemini API 키**: `backend/.env`에 `GEMINI_API_KEY` 설정 시 뉴스 수집 활성화
+   (미설정 시 빈 리스트 반환, 파이프라인은 중단 없이 진행)
 
 ### 🟢 향후 기능 (우선순위 낮음)
 
-9. **종목 상세 페이지**: pykrx로 개별 종목 OHLCV 조회 엔드포인트 추가
-10. **관심 종목 알림**: Supabase Edge Functions으로 푸시 알림
-11. **배포**: Vercel(FE) + Railway(BE) 배포 설정
-12. **인증**: Supabase Auth로 사용자 인증 추가
+3. **관심 종목 알림**: Supabase Edge Functions으로 푸시 알림
+4. **인증**: Supabase Auth로 사용자 인증 추가
 
 ---
 
