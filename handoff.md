@@ -1,6 +1,6 @@
 # KSI Handoff — Korean Stock Intelligence
-> 마지막 업데이트: 2026-03-07
-> 상태: **배포 완료** — Vercel (FE) + Railway (BE) 운영 중 / 코드 레벨 TODO 모두 완료
+> 마지막 업데이트: 2026-03-07 (2차)
+> 상태: **운영 중** — Vercel (FE) + Railway (BE) 배포 완료 / pykrx 런타임 오류 미해결
 
 ---
 
@@ -140,26 +140,44 @@ npm run dev   # localhost:3000
 
 ### ✅ 완료된 항목 (2026-03-07)
 
-1. **`stock/[ticker]/page.tsx`**: pykrx 실제 OHLCV 데이터 연동 완료 (`GET /api/v1/stocks/{ticker}/price`)
-2. **전략 페이지 필드 정렬**: `approach`, `key_stocks`, `POSITION_LABELS` 한국어 매핑 모두 구현됨
-3. **`stock_picker.py` fallback**: `_latest_trading_date()` — 장 마감·주말·공휴일 자동 전일 데이터 탐색
-4. **보고서 자동 갱신**: `fetchBriefingStatus` 5초 폴링 + `file_mtime` 비교로 완료 감지
-5. **Supabase 마이그레이션 SQL**: `001_create_tables.sql` + `002_schema_update.sql` 준비됨
-6. **배포**: Vercel (FE) + Railway (BE) 운영 중
+1. **`stock/[ticker]/page.tsx`**: pykrx 실제 OHLCV 데이터 연동 완료
+2. **전략 페이지 필드 정렬**: `approach`, `key_stocks`, `POSITION_LABELS` 한국어 매핑
+3. **`stock_picker.py` fallback**: `_latest_trading_date()` — 주말·공휴일 자동 전일 탐색
+4. **보고서 자동 갱신**: `fetchBriefingStatus` 5초 폴링 + `file_mtime` 비교
+5. **Supabase 마이그레이션 SQL**: `001_create_tables.sql` + `002_schema_update.sql` 준비
+6. **배포 완료**: Vercel (FE) + Railway (BE) 운영 중
+7. **관심종목 섹션**: 대시보드·브리핑·전략 페이지에 `WatchlistSection` 공통 컴포넌트 추가
+8. **CORS**: `.vercel.app`, `.railway.app` 도메인 regex 허용
+9. **Railway Dockerfile 빌더 전환**: nixpacks → Dockerfile, `sh -c`로 PORT 확장 해결
+
+### 🔴 미해결 버그 (우선순위 높음)
+
+1. **pykrx `pkg_resources` 런타임 오류**
+   - 증상: `GET /api/v1/stocks/{ticker}/price` → 500, `No module named 'pkg_resources'`
+   - 원인: Railway Dockerfile 빌드 환경에서 `setuptools`가 설치되어도 `pykrx` 런타임에 `pkg_resources` 미인식
+   - 영향: 관심종목 현재가·등락률 표시 안됨 (`—` 로 표기), 종목 상세 차트 불가
+   - 시도한 것: `setuptools>=65.5.0` 추가, `beautifulsoup4`·`lxml` 추가, nixpacks.toml → Dockerfile 전환
+   - 다음 시도 방향:
+     - `pykrx` 최신 버전으로 업그레이드 (`pip install pykrx --upgrade`)
+     - 또는 `pykrx` 대신 `FinanceDataReader`로 가격 조회 대체
+     - 또는 Railway 환경에서 `python -c "import pkg_resources"` 로 직접 확인
+
+2. **브리핑 파일 미생성**
+   - 증상: `/reports` 페이지에서 `404 브리핑 파일이 없습니다`
+   - 원인: 스케줄러가 아직 실행 시간에 도달하지 않음 (Railway 재배포마다 초기화)
+   - 해결: `/reports` 페이지에서 "브리핑 즉시 실행" 버튼으로 수동 생성
 
 ### 🔴 운영 환경 설정 필요 (코드 변경 없음)
 
-1. **Supabase 테이블 생성**: Supabase 대시보드 > SQL Editor에서 아래 순서로 실행
+3. **Supabase 테이블 생성**: Supabase 대시보드 > SQL Editor에서 순서대로 실행
    - `backend/migrations/001_create_tables.sql`
    - `backend/migrations/002_schema_update.sql`
-   - 이후 watchlist 테이블 Realtime 활성화 확인
-2. **Gemini API 키**: `backend/.env`에 `GEMINI_API_KEY` 설정 시 뉴스 수집 활성화
-   (미설정 시 빈 리스트 반환, 파이프라인은 중단 없이 진행)
+4. **Gemini API 키**: Railway Variables에 `GEMINI_API_KEY` 설정 시 뉴스 수집 활성화
 
 ### 🟢 향후 기능 (우선순위 낮음)
 
-3. **관심 종목 알림**: Supabase Edge Functions으로 푸시 알림
-4. **인증**: Supabase Auth로 사용자 인증 추가
+5. **관심 종목 알림**: Supabase Edge Functions으로 푸시 알림
+6. **인증**: Supabase Auth로 사용자 인증 추가
 
 ---
 
