@@ -74,9 +74,21 @@ def _load_stock_names():
 
 
 def get_stock_name(ticker: str) -> str:
-    """종목 코드 → 종목명 반환 (캐시 활용)"""
+    """종목 코드 → 종목명 반환 (캐시 활용, 미스 시 pykrx 단건 조회)"""
     _load_stock_names()
-    return _stock_name_cache.get(ticker, ticker)
+    if ticker in _stock_name_cache:
+        return _stock_name_cache[ticker]
+
+    # 캐시 미스 — pykrx 단건 조회 (Railway에서 작동 확인됨)
+    try:
+        from pykrx import stock
+        name = stock.get_market_ticker_name(ticker)
+        if name:
+            _stock_name_cache[ticker] = name
+            return name
+    except Exception:
+        pass
+    return ticker
 
 
 def _fmt_net(value: float) -> str:

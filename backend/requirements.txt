@@ -14,7 +14,7 @@ beautifulsoup4>=4.12.0
 lxml>=4.9.0
 
 # 주식 데이터
-pykrx==1.0.47
+pykrx>=1.2.0
 finance-datareader>=0.9.66
 pandas==2.2.2
 numpy==1.26.4
