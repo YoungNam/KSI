@@ -384,15 +384,39 @@ async def debug_pykrx():
     except Exception as e:
         results["pykrx_import"] = f"FAIL: {e}"
 
-    # 4. pykrx 데이터 조회 테스트
+    # 4. pykrx 인덱스 OHLCV 테스트
     try:
         from pykrx import stock
         df = stock.get_index_ohlcv("20260301", "20260307", "1001")
-        results["pykrx_data"] = f"OK ({len(df)} rows)"
+        results["pykrx_index"] = f"OK ({len(df)} rows, cols={list(df.columns)})"
     except Exception as e:
-        results["pykrx_data"] = f"FAIL: {e}"
+        results["pykrx_index"] = f"FAIL: {e}"
 
-    # 5. FDR StockListing 테스트
+    # 5. pykrx 시장 전체 OHLCV 테스트
+    try:
+        from pykrx import stock
+        df = stock.get_market_ohlcv("20260306", market="KOSPI")
+        results["pykrx_market"] = f"OK ({len(df)} rows, cols={list(df.columns)})"
+    except Exception as e:
+        results["pykrx_market"] = f"FAIL: {e}"
+
+    # 6. pykrx 투자자 수급 테스트
+    try:
+        from pykrx import stock
+        df = stock.get_market_trading_value_by_date("20260301", "20260307", "KOSPI")
+        results["pykrx_investor"] = f"OK ({len(df)} rows, cols={list(df.columns)})"
+    except Exception as e:
+        results["pykrx_investor"] = f"FAIL: {e}"
+
+    # 7. pykrx 종목명 테스트
+    try:
+        from pykrx import stock
+        name = stock.get_market_ticker_name("005930")
+        results["pykrx_name"] = f"OK ({name})"
+    except Exception as e:
+        results["pykrx_name"] = f"FAIL: {e}"
+
+    # 8. FDR StockListing 테스트
     try:
         import FinanceDataReader as fdr
         listing = fdr.StockListing("KOSPI")
@@ -400,7 +424,7 @@ async def debug_pykrx():
     except Exception as e:
         results["fdr_listing"] = f"FAIL: {e}"
 
-    # 6. Python 버전
+    # 9. Python 버전
     import sys
     results["python"] = sys.version
 
