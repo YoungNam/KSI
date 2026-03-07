@@ -144,7 +144,7 @@ def analyze_market() -> MarketAnalysis:
     korean = fetch_korean_market()
     global_ = fetch_global_market()
 
-    # KOSPI 기술 지표 계산 (과거 60일치 필요) — FDR 우선, pykrx fallback
+    # KOSPI 기술 지표 계산 (과거 60일치 필요) — FDR (Yahoo Finance)
     indicators: dict = {}
     try:
         import FinanceDataReader as fdr
@@ -153,17 +153,8 @@ def analyze_market() -> MarketAnalysis:
         kospi_df = fdr.DataReader("^KS11", start_fdr, end_fdr)
         if not kospi_df.empty:
             indicators = _calc_indicators(kospi_df)
-    except Exception as e1:
-        print(f"[market_analyst] FDR 기술 지표 실패, pykrx 시도: {e1}")
-        try:
-            from pykrx import stock
-            today = datetime.today().strftime("%Y%m%d")
-            start = (datetime.today() - timedelta(days=90)).strftime("%Y%m%d")
-            kospi_df = stock.get_index_ohlcv(start, today, "1001")
-            if not kospi_df.empty:
-                indicators = _calc_indicators(kospi_df)
-        except Exception as e2:
-            print(f"[market_analyst] 기술 지표 계산 실패: {e2}")
+    except Exception as e:
+        print(f"[market_analyst] 기술 지표 계산 실패: {e}")
 
     score, phase, stance = _score_market(
         indicators,

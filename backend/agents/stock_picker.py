@@ -237,15 +237,7 @@ def scan_featured_stocks(
     """
     print(f"[stock_picker] {market} 특징주 스캔 시작")
 
-    # pykrx 시도
-    try:
-        candidates = _scan_with_pykrx(market, top_n)
-        print(f"[stock_picker] pykrx 스캔 완료 — {len(candidates)}종목")
-        return candidates
-    except Exception as e:
-        print(f"[stock_picker] pykrx 스캔 실패, FDR fallback: {e}")
-
-    # FDR fallback
+    # FDR 기반 스캔 (pykrx get_market_ohlcv KRX API 호환 문제로 사용 불가)
     try:
         candidates = _scan_with_fdr(market, top_n)
         print(f"[stock_picker] FDR 스캔 완료 — {len(candidates)}종목")

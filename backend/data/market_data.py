@@ -141,33 +141,12 @@ def fetch_korean_market() -> KoreanMarket:
         kospi_chg  = (float(kospi_latest["Close"])  - kospi_prev)  / kospi_prev  * 100
         kosdaq_chg = (float(kosdaq_latest["Close"]) - kosdaq_prev) / kosdaq_prev * 100
 
-        # 거래대금 — Yahoo Finance 인덱스는 거래대금을 제공하지 않으므로 pykrx fallback
+        # 거래대금·수급 — pykrx KRX API 호환 문제로 현재 미제공
+        # TODO: KRX Open API 또는 pykrx 호환 버전 나오면 복구
         kospi_vol = "—"
         kosdaq_vol = "—"
-        try:
-            from pykrx import stock as pykrx_stock
-            pykrx_start, pykrx_end = _recent_trading_date(7)
-            k_df = pykrx_stock.get_index_ohlcv(pykrx_start, pykrx_end, "1001")
-            q_df = pykrx_stock.get_index_ohlcv(pykrx_start, pykrx_end, "2001")
-            if not k_df.empty:
-                kospi_vol = _fmt_volume(float(k_df.iloc[-1].get("거래대금", 0)))
-            if not q_df.empty:
-                kosdaq_vol = _fmt_volume(float(q_df.iloc[-1].get("거래대금", 0)))
-        except Exception as e:
-            print(f"[market_data] pykrx 거래대금 조회 실패 (무시): {e}")
-
-        # 외국인·기관 수급 — pykrx에서만 제공, fallback으로 시도
-        foreign_net = inst_net = "—"
-        try:
-            from pykrx import stock
-            pykrx_start, pykrx_end = _recent_trading_date(7)
-            inv_df = stock.get_market_trading_value_by_date(pykrx_start, pykrx_end, "KOSPI")
-            if not inv_df.empty:
-                last_inv = inv_df.iloc[-1]
-                foreign_net = _fmt_net(float(last_inv.get("외국인합계", 0)))
-                inst_net    = _fmt_net(float(last_inv.get("기관합계", 0)))
-        except Exception as e:
-            print(f"[market_data] pykrx 수급 조회 실패 (무시): {e}")
+        foreign_net = "—"
+        inst_net = "—"
 
         return KoreanMarket(
             kospi_index=float(kospi_latest["Close"]),
