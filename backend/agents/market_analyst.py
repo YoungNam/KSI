@@ -9,25 +9,10 @@ market_analyst.py — KOSPI·KOSDAQ 시장 분석
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
-from agents.report_writer import GlobalMarket, KoreanMarket
 from data.market_data import fetch_global_market, fetch_korean_market
-
-
-# ────────────────────────────────────────────────
-# 결과 구조체
-# ────────────────────────────────────────────────
-
-@dataclass
-class MarketAnalysis:
-    korean_market:  KoreanMarket
-    global_market:  GlobalMarket
-    market_score:   int    = 50       # 0~100 종합점수
-    market_phase:   str    = "횡보"   # 강세 / 횡보 / 약세
-    overall_stance: str    = "중립"   # 공격적 / 중립 / 방어적
-    indicators:     dict   = field(default_factory=dict)  # 기술 지표 상세
+from models import GlobalMarket, KoreanMarket, MarketAnalysis
 
 
 # ────────────────────────────────────────────────

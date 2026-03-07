@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-from agents.report_writer import StockCandidate
+from models import StockCandidate
 
 
 # 등락률·거래량 필터 기준

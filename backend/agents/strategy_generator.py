@@ -30,8 +30,7 @@ import re
 from datetime import date, datetime
 from pathlib import Path
 
-from agents.market_analyst import MarketAnalysis
-from agents.report_writer import NewsItem, StockCandidate
+from models import MarketAnalysis, NewsItem, StockCandidate
 
 REPORTS_DIR = Path(__file__).parent.parent / "reports"
 REPORTS_DIR.mkdir(exist_ok=True)

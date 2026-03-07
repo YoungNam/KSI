@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 from datetime import datetime, timedelta
 
-from agents.report_writer import GlobalMarket, KoreanMarket
+from models import GlobalMarket, KoreanMarket
 
 
 # ────────────────────────────────────────────────

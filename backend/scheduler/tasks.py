@@ -2,10 +2,10 @@
 APScheduler 태스크 — 4회 정기 브리핑 스케줄
 
 파이프라인 흐름:
-  모닝    : market_analyst → news_monitor(global+domestic) → stock_picker → strategy_generator → report_writer
-  장초반  : market_analyst(실시간) → stock_picker → report_writer
-  장마감  : market_analyst(마감) → stock_picker → report_writer
-  이브닝  : market_analyst → news_monitor(evening) → strategy_generator → report_writer
+  모닝    : market_analyst → news_monitor → stock_picker → strategy_generator → Supabase 저장
+  장초반  : market_analyst → stock_picker → news_monitor → Supabase 저장
+  장마감  : market_analyst → stock_picker → news_monitor → fetch_tomorrow_events → Supabase 저장
+  이브닝  : market_analyst → Gemini(evening) → strategy_generator → Supabase 저장
 """
 from datetime import date
 
@@ -14,7 +14,6 @@ from apscheduler.triggers.cron import CronTrigger
 
 from agents.market_analyst import analyze_market
 from agents.news_monitor import fetch_news, fetch_tomorrow_events
-from agents.report_writer import BriefingContext, BriefingType, StockCandidate, run_briefing
 from agents.stock_picker import scan_featured_stocks, scan_by_tickers
 from agents.strategy_generator import run_strategy
 from db.supabase import (
@@ -22,14 +21,23 @@ from db.supabase import (
     save_market_report,
     save_daily_strategy,
 )
+from models import StockCandidate
 
 scheduler = BackgroundScheduler(timezone="Asia/Seoul")
 
 
-def _ctx_to_content(ctx: BriefingContext) -> dict:
-    """BriefingContext를 Supabase JSONB 저장용 딕셔너리로 변환"""
-    k = ctx.korean_market
-    g = ctx.global_market
+def _build_report_content(
+    korean_market,
+    global_market,
+    news_items,
+    stocks,
+    strategy_json=None,
+    market_outlook="",
+    key_message="",
+) -> dict:
+    """Supabase JSONB 저장용 딕셔너리 구성"""
+    k = korean_market
+    g = global_market
     return {
         "korean_market": {
             "kospi_index":    k.kospi_index,
@@ -53,15 +61,15 @@ def _ctx_to_content(ctx: BriefingContext) -> dict:
         },
         "news_items": [
             {"impact": n.impact, "title": n.title, "summary": n.summary, "sectors": n.sectors}
-            for n in ctx.news_items
+            for n in news_items
         ],
         "stocks": [
             {"ticker": s.ticker, "name": s.name, "action": s.action, "reason": s.reason}
-            for s in ctx.stocks
+            for s in stocks
         ],
-        "strategy_json":  ctx.strategy_json,
-        "market_outlook": ctx.market_outlook,
-        "key_message":    ctx.key_message,
+        "strategy_json":  strategy_json or {},
+        "market_outlook": market_outlook,
+        "key_message":    key_message,
     }
 
 
@@ -110,24 +118,16 @@ def ntx_morning_briefing():
         # 4. 투자 전략 생성
         strategy = run_strategy(analysis, news, stocks)
 
-        # 5. 브리핑 리포트 생성
-        ctx = BriefingContext(
-            report_date=date.today(),
-            briefing_type=BriefingType.MORNING,
-            global_market=analysis.global_market,
-            korean_market=analysis.korean_market,
-            news_items=news,
-            stocks=stocks,
-            strategy_json=strategy,
+        # 5. Supabase 저장 (전략 + 리포트)
+        save_daily_strategy(strategy)
+        content = _build_report_content(
+            analysis.korean_market, analysis.global_market,
+            news, stocks, strategy,
             market_outlook=strategy.get("summary", ""),
             key_message=strategy.get("risk_management", {}).get("notes", ""),
         )
-        path = run_briefing(ctx)
-        print(f"[스케줄러] 모닝 브리핑 완료: {path}")
-
-        # Supabase 저장 (전략 + 브리핑)
-        save_daily_strategy(strategy)
-        save_market_report(ctx.report_date, ctx.briefing_type.value, analysis.market_score, _ctx_to_content(ctx))
+        save_market_report(date.today(), "morning", analysis.market_score, content)
+        print("[스케줄러] 모닝 브리핑 완료")
 
     except Exception as e:
         print(f"[스케줄러] 모닝 브리핑 실패: {e}")
@@ -146,23 +146,21 @@ def market_open_update():
         # 3. 장중 속보 이슈
         news = fetch_news("domestic")
 
-        # 4. 브리핑 생성
-        ctx = BriefingContext(
-            report_date=date.today(),
-            briefing_type=BriefingType.OPEN,
-            korean_market=analysis.korean_market,
-            news_items=news,
-            stocks=stocks,
-            market_outlook=f"KOSPI {analysis.korean_market.kospi_change:+.2f}% / "
-                           f"KOSDAQ {analysis.korean_market.kosdaq_change:+.2f}% — "
-                           f"시장 {analysis.market_phase}",
-            key_message="장 초반 15분봉 추세 확립 후 진입 권장" if analysis.market_phase == "횡보" else "",
+        # 4. Supabase 저장
+        market_outlook = (
+            f"KOSPI {analysis.korean_market.kospi_change:+.2f}% / "
+            f"KOSDAQ {analysis.korean_market.kosdaq_change:+.2f}% — "
+            f"시장 {analysis.market_phase}"
         )
-        path = run_briefing(ctx)
-        print(f"[스케줄러] 장 초반 업데이트 완료: {path}")
-
-        # Supabase 저장 (브리핑)
-        save_market_report(ctx.report_date, ctx.briefing_type.value, analysis.market_score, _ctx_to_content(ctx))
+        key_message = "장 초반 15분봉 추세 확립 후 진입 권장" if analysis.market_phase == "횡보" else ""
+        content = _build_report_content(
+            analysis.korean_market, analysis.global_market,
+            news, stocks,
+            market_outlook=market_outlook,
+            key_message=key_message,
+        )
+        save_market_report(date.today(), "open", analysis.market_score, content)
+        print("[스케줄러] 장 초반 업데이트 완료")
 
     except Exception as e:
         print(f"[스케줄러] 장 초반 업데이트 실패: {e}")
@@ -181,29 +179,25 @@ def market_close_report():
         # 3. 당일 주요 이슈
         news = fetch_news("domestic")
 
-        # 4. 내일 주요 일정 (이브닝 프롬프트의 이벤트 부분만 선제 수집)
+        # 4. 내일 주요 일정
         tomorrow = fetch_tomorrow_events()
 
-        # 5. 브리핑 생성
-        ctx = BriefingContext(
-            report_date=date.today(),
-            briefing_type=BriefingType.CLOSE,
-            korean_market=analysis.korean_market,
-            news_items=news,
-            stocks=stocks,
-            strategy_json={
-                "market_phase": analysis.market_phase,
-                "overall_stance": analysis.overall_stance,
-                "summary": f"KOSPI {analysis.korean_market.kospi_change:+.2f}% 마감. "
-                           f"시장점수 {analysis.market_score}. 외국인 {analysis.korean_market.foreign_net}.",
-            },
-            tomorrow_events=tomorrow,
+        # 5. Supabase 저장
+        strategy_json = {
+            "market_phase": analysis.market_phase,
+            "overall_stance": analysis.overall_stance,
+            "summary": (
+                f"KOSPI {analysis.korean_market.kospi_change:+.2f}% 마감. "
+                f"시장점수 {analysis.market_score}. 외국인 {analysis.korean_market.foreign_net}."
+            ),
+        }
+        content = _build_report_content(
+            analysis.korean_market, analysis.global_market,
+            news, stocks, strategy_json,
         )
-        path = run_briefing(ctx)
-        print(f"[스케줄러] 장 마감 리포트 완료: {path}")
-
-        # Supabase 저장 (브리핑)
-        save_market_report(ctx.report_date, ctx.briefing_type.value, analysis.market_score, _ctx_to_content(ctx))
+        content["tomorrow_events"] = tomorrow
+        save_market_report(date.today(), "close", analysis.market_score, content)
+        print("[스케줄러] 장 마감 리포트 완료")
 
     except Exception as e:
         print(f"[스케줄러] 장 마감 리포트 실패: {e}")
@@ -216,9 +210,8 @@ def ntx_evening_briefing():
         # 1. 글로벌 시장 분석 (미국 선물 포함)
         analysis = analyze_market()
 
-        # 2. 글로벌 이슈 + 익일 이벤트 수집 (evening 모드 — 한 번 호출로 두 가지 획득)
-        import google.generativeai as genai
-        import os, re, json
+        # 2. 글로벌 이슈 + 익일 이벤트 수집 (evening 모드)
+        import json, re
         from agents.news_monitor import _QUERY_EVENING, _call_gemini, _dicts_to_news_items
         raw_evening = _call_gemini(_QUERY_EVENING)
 
@@ -235,24 +228,17 @@ def ntx_evening_briefing():
         # 3. 익일 예비 전략 생성
         strategy = run_strategy(analysis, news, [])
 
-        # 4. 브리핑 생성
-        ctx = BriefingContext(
-            report_date=date.today(),
-            briefing_type=BriefingType.EVENING,
-            global_market=analysis.global_market,
-            korean_market=analysis.korean_market,
-            news_items=news,
-            strategy_json=strategy,
+        # 4. Supabase 저장 (전략 + 리포트)
+        save_daily_strategy(strategy)
+        content = _build_report_content(
+            analysis.korean_market, analysis.global_market,
+            news, [], strategy,
             market_outlook=strategy.get("summary", ""),
             key_message=strategy.get("risk_management", {}).get("notes", ""),
-            tomorrow_events=tomorrow,
         )
-        path = run_briefing(ctx)
-        print(f"[스케줄러] 이브닝 브리핑 완료: {path}")
-
-        # Supabase 저장 (전략 + 브리핑)
-        save_daily_strategy(strategy)
-        save_market_report(ctx.report_date, ctx.briefing_type.value, analysis.market_score, _ctx_to_content(ctx))
+        content["tomorrow_events"] = tomorrow
+        save_market_report(date.today(), "evening", analysis.market_score, content)
+        print("[스케줄러] 이브닝 브리핑 완료")
 
     except Exception as e:
         print(f"[스케줄러] 이브닝 브리핑 실패: {e}")

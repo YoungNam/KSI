@@ -13,7 +13,7 @@ import json
 import os
 import re
 
-from agents.report_writer import NewsItem
+from models import NewsItem
 
 
 # ────────────────────────────────────────────────
