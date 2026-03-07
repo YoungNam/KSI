@@ -150,17 +150,15 @@ npm run dev   # localhost:3000
 8. **CORS**: `.vercel.app`, `.railway.app` 도메인 regex 허용
 9. **Railway Dockerfile 빌더 전환**: nixpacks → Dockerfile, `sh -c`로 PORT 확장 해결
 
-### 🔴 미해결 버그 (우선순위 높음)
+### ✅ 해결됨 (2026-03-07)
 
-1. **pykrx `pkg_resources` 런타임 오류**
-   - 증상: `GET /api/v1/stocks/{ticker}/price` → 500, `No module named 'pkg_resources'`
-   - 원인: Railway Dockerfile 빌드 환경에서 `setuptools`가 설치되어도 `pykrx` 런타임에 `pkg_resources` 미인식
-   - 영향: 관심종목 현재가·등락률 표시 안됨 (`—` 로 표기), 종목 상세 차트 불가
-   - 시도한 것: `setuptools>=65.5.0` 추가, `beautifulsoup4`·`lxml` 추가, nixpacks.toml → Dockerfile 전환
-   - 다음 시도 방향:
-     - `pykrx` 최신 버전으로 업그레이드 (`pip install pykrx --upgrade`)
-     - 또는 `pykrx` 대신 `FinanceDataReader`로 가격 조회 대체
-     - 또는 Railway 환경에서 `python -c "import pkg_resources"` 로 직접 확인
+1. **pykrx `pkg_resources` 런타임 오류** → FinanceDataReader(Yahoo Finance)로 대체
+   - `router.py`: `/stocks/{ticker}/price` → FDR DataReader 사용
+   - `market_data.py`: 인덱스 데이터 → FDR `^KS11`/`^KQ11` 사용, 수급·거래대금은 pykrx fallback
+   - `market_analyst.py`: 기술 지표 계산 → FDR 우선, pykrx fallback
+   - `stock_picker.py`: 시장 스캔 → pykrx 우선, FDR fallback (주요 종목 하드코딩 포함)
+
+### 🔴 미해결 이슈
 
 2. **브리핑 파일 미생성**
    - 증상: `/reports` 페이지에서 `404 브리핑 파일이 없습니다`

@@ -10,7 +10,7 @@ POST /briefing/run     → 수동 브리핑 즉시 실행
 """
 import asyncio
 import json
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -243,21 +243,21 @@ async def get_stock_price(
     days: int = Query(default=30, ge=5, le=365, description="조회 거래일 수"),
 ):
     """
-    개별 종목 OHLCV 히스토리 반환 (pykrx).
+    개별 종목 OHLCV 히스토리 반환 (FinanceDataReader).
     장 마감·주말에는 최근 거래일 데이터를 반환합니다.
     """
     try:
-        from pykrx import stock
-        from datetime import datetime, timedelta
+        import FinanceDataReader as fdr
+        from data.market_data import get_stock_name
 
         # 거래일 여유를 두어 충분한 기간 조회
         end = datetime.today()
         start = end - timedelta(days=days + 30)
 
-        start_str = start.strftime("%Y%m%d")
-        end_str = end.strftime("%Y%m%d")
+        start_str = start.strftime("%Y-%m-%d")
+        end_str = end.strftime("%Y-%m-%d")
 
-        df = stock.get_market_ohlcv(start_str, end_str, ticker)
+        df = fdr.DataReader(ticker, start_str, end_str)
 
         if df.empty:
             raise HTTPException(status_code=404, detail=f"종목 {ticker} 데이터를 찾을 수 없습니다.")
@@ -265,43 +265,17 @@ async def get_stock_price(
         # 최근 days 거래일만 반환
         df = df.tail(days)
 
-        # 종목명 조회
-        try:
-            name = stock.get_market_ticker_name(ticker)
-        except Exception:
-            name = ticker
-
-        # 컬럼명 정규화 (pykrx 버전별 차이 대응)
-        col_map = {
-            "시가": ["시가", "Open"],
-            "고가": ["고가", "High"],
-            "저가": ["저가", "Low"],
-            "종가": ["종가", "Close"],
-            "거래량": ["거래량", "Volume"],
-        }
-        def _get_col(name_list):
-            for c in name_list:
-                if c in df.columns:
-                    return c
-            return None
-
-        open_col   = _get_col(col_map["시가"])
-        high_col   = _get_col(col_map["고가"])
-        low_col    = _get_col(col_map["저가"])
-        close_col  = _get_col(col_map["종가"])
-        volume_col = _get_col(col_map["거래량"])
-
-        if close_col is None:
-            raise HTTPException(status_code=500, detail="종가 컬럼을 찾을 수 없습니다.")
+        # 종목명 조회 (FDR 캐시)
+        name = get_stock_name(ticker)
 
         price_history = [
             {
                 "date": idx.strftime("%Y-%m-%d"),
-                "open":   int(row[open_col])   if open_col   else 0,
-                "high":   int(row[high_col])   if high_col   else 0,
-                "low":    int(row[low_col])    if low_col    else 0,
-                "close":  int(row[close_col]),
-                "volume": int(row[volume_col]) if volume_col else 0,
+                "open":   int(row.get("Open", 0)),
+                "high":   int(row.get("High", 0)),
+                "low":    int(row.get("Low", 0)),
+                "close":  int(row["Close"]),
+                "volume": int(row.get("Volume", 0)),
             }
             for idx, row in df.iterrows()
         ]

@@ -1,9 +1,10 @@
 """
-market_data.py — pykrx + FinanceDataReader 기반 시장 데이터 수집
+market_data.py — FinanceDataReader 기반 시장 데이터 수집 (pykrx fallback)
 
 함수:
   fetch_korean_market()  → KoreanMarket
   fetch_global_market()  → GlobalMarket
+  get_stock_name(ticker) → str  (종목명 캐시)
 """
 from __future__ import annotations
 
@@ -11,6 +12,71 @@ import os
 from datetime import datetime, timedelta
 
 from agents.report_writer import GlobalMarket, KoreanMarket
+
+
+# ────────────────────────────────────────────────
+# 종목명 캐시 (FDR StockListing 기반)
+# ────────────────────────────────────────────────
+
+_stock_name_cache: dict[str, str] = {}
+_cache_loaded = False
+
+
+def _load_stock_names():
+    """종목명 캐시 로드 — FDR StockListing 시도, 실패 시 KRX API 직접 호출"""
+    global _stock_name_cache, _cache_loaded
+    if _cache_loaded:
+        return
+
+    # 1차: FDR StockListing
+    try:
+        import FinanceDataReader as fdr
+        for mkt in ["KOSPI", "KOSDAQ"]:
+            listing = fdr.StockListing(mkt)
+            for _, row in listing.iterrows():
+                code = str(row.get("Code", row.get("Symbol", "")))
+                name = str(row.get("Name", ""))
+                if code and name:
+                    _stock_name_cache[code] = name
+        if _stock_name_cache:
+            _cache_loaded = True
+            print(f"[market_data] 종목명 캐시 완료 (FDR): {len(_stock_name_cache)}종목")
+            return
+    except Exception as e:
+        print(f"[market_data] FDR 종목명 로드 실패: {e}")
+
+    # 2차: KRX Open API 직접 호출
+    try:
+        import requests
+        for mkt_id in ["STK", "KSQ"]:  # STK=KOSPI, KSQ=KOSDAQ
+            url = "http://data.krx.co.kr/comm/bldAttendant/getJsonData.cmd"
+            payload = {
+                "bld": "dbms/MDC/STAT/standard/MDCSTAT01901",
+                "mktId": mkt_id,
+                "share": "1",
+                "csvxls_is498No": "",
+            }
+            headers = {"User-Agent": "Mozilla/5.0", "Referer": "http://data.krx.co.kr/"}
+            r = requests.post(url, data=payload, headers=headers, timeout=10)
+            if r.status_code == 200:
+                data = r.json()
+                for item in data.get("OutBlock_1", []):
+                    code = item.get("ISU_SRT_CD", "")
+                    name = item.get("ISU_ABBRV", "")
+                    if code and name:
+                        _stock_name_cache[code] = name
+        if _stock_name_cache:
+            _cache_loaded = True
+            print(f"[market_data] 종목명 캐시 완료 (KRX API): {len(_stock_name_cache)}종목")
+            return
+    except Exception as e:
+        print(f"[market_data] KRX API 종목명 로드 실패: {e}")
+
+
+def get_stock_name(ticker: str) -> str:
+    """종목 코드 → 종목명 반환 (캐시 활용)"""
+    _load_stock_names()
+    return _stock_name_cache.get(ticker, ticker)
 
 
 def _fmt_net(value: float) -> str:
@@ -39,16 +105,16 @@ def _recent_trading_date(days_back: int = 5) -> tuple[str, str]:
 # ────────────────────────────────────────────────
 
 def fetch_korean_market() -> KoreanMarket:
-    """KOSPI·KOSDAQ 지수 및 외국인·기관 수급 수집"""
+    """KOSPI·KOSDAQ 지수 및 외국인·기관 수급 수집 (FDR 우선, pykrx fallback)"""
     try:
-        from pykrx import stock
+        import FinanceDataReader as fdr
 
-        start, end = _recent_trading_date(7)
+        start = (datetime.today() - timedelta(days=10)).strftime("%Y-%m-%d")
+        end   = datetime.today().strftime("%Y-%m-%d")
 
-        # KOSPI (코드: 1001)
-        kospi_df = stock.get_index_ohlcv(start, end, "1001")
-        # KOSDAQ (코드: 2001)
-        kosdaq_df = stock.get_index_ohlcv(start, end, "2001")
+        # KOSPI (^KS11), KOSDAQ (^KQ11) — Yahoo Finance 심볼
+        kospi_df  = fdr.DataReader("^KS11", start, end)
+        kosdaq_df = fdr.DataReader("^KQ11", start, end)
 
         if kospi_df.empty or kosdaq_df.empty:
             return KoreanMarket()
@@ -57,32 +123,44 @@ def fetch_korean_market() -> KoreanMarket:
         kosdaq_latest = kosdaq_df.iloc[-1]
 
         # 등락률 계산 (전일 대비)
-        kospi_prev  = kospi_df.iloc[-2]["종가"] if len(kospi_df) >= 2 else kospi_latest["종가"]
-        kosdaq_prev = kosdaq_df.iloc[-2]["종가"] if len(kosdaq_df) >= 2 else kosdaq_latest["종가"]
+        kospi_prev  = float(kospi_df["Close"].iloc[-2]) if len(kospi_df) >= 2 else float(kospi_latest["Close"])
+        kosdaq_prev = float(kosdaq_df["Close"].iloc[-2]) if len(kosdaq_df) >= 2 else float(kosdaq_latest["Close"])
 
-        kospi_chg  = (kospi_latest["종가"]  - kospi_prev)  / kospi_prev  * 100
-        kosdaq_chg = (kosdaq_latest["종가"] - kosdaq_prev) / kosdaq_prev * 100
+        kospi_chg  = (float(kospi_latest["Close"])  - kospi_prev)  / kospi_prev  * 100
+        kosdaq_chg = (float(kosdaq_latest["Close"]) - kosdaq_prev) / kosdaq_prev * 100
 
-        # 거래대금
-        kospi_vol  = _fmt_volume(float(kospi_latest.get("거래대금", 0)))
-        kosdaq_vol = _fmt_volume(float(kosdaq_latest.get("거래대금", 0)))
-
-        # 전체 시장 외국인·기관 수급 (KOSPI)
+        # 거래대금 — Yahoo Finance 인덱스는 거래대금을 제공하지 않으므로 pykrx fallback
+        kospi_vol = "—"
+        kosdaq_vol = "—"
         try:
-            inv_df = stock.get_market_trading_value_by_date(start, end, "KOSPI")
+            from pykrx import stock as pykrx_stock
+            pykrx_start, pykrx_end = _recent_trading_date(7)
+            k_df = pykrx_stock.get_index_ohlcv(pykrx_start, pykrx_end, "1001")
+            q_df = pykrx_stock.get_index_ohlcv(pykrx_start, pykrx_end, "2001")
+            if not k_df.empty:
+                kospi_vol = _fmt_volume(float(k_df.iloc[-1].get("거래대금", 0)))
+            if not q_df.empty:
+                kosdaq_vol = _fmt_volume(float(q_df.iloc[-1].get("거래대금", 0)))
+        except Exception as e:
+            print(f"[market_data] pykrx 거래대금 조회 실패 (무시): {e}")
+
+        # 외국인·기관 수급 — pykrx에서만 제공, fallback으로 시도
+        foreign_net = inst_net = "—"
+        try:
+            from pykrx import stock
+            pykrx_start, pykrx_end = _recent_trading_date(7)
+            inv_df = stock.get_market_trading_value_by_date(pykrx_start, pykrx_end, "KOSPI")
             if not inv_df.empty:
                 last_inv = inv_df.iloc[-1]
                 foreign_net = _fmt_net(float(last_inv.get("외국인합계", 0)))
                 inst_net    = _fmt_net(float(last_inv.get("기관합계", 0)))
-            else:
-                foreign_net = inst_net = "—"
-        except Exception:
-            foreign_net = inst_net = "—"
+        except Exception as e:
+            print(f"[market_data] pykrx 수급 조회 실패 (무시): {e}")
 
         return KoreanMarket(
-            kospi_index=float(kospi_latest["종가"]),
+            kospi_index=float(kospi_latest["Close"]),
             kospi_change=round(kospi_chg, 2),
-            kosdaq_index=float(kosdaq_latest["종가"]),
+            kosdaq_index=float(kosdaq_latest["Close"]),
             kosdaq_change=round(kosdaq_chg, 2),
             kospi_volume=kospi_vol,
             kosdaq_volume=kosdaq_vol,
