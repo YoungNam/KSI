@@ -30,7 +30,7 @@ const buttonVariants = cva(
           "bg-transparent text-[#F0F4FF] border border-[#242D3D] hover:bg-[#1E2535] hover:border-[#3182F6]/40",
         // Ghost — 배경 없음
         ghost:
-          "bg-transparent text-[#8B96A9] hover:bg-[#1E2535] hover:text-[#F0F4FF]",
+          "bg-transparent text-[#A0AEBF] hover:bg-[#1E2535] hover:text-[#F0F4FF]",
         // Link — 밑줄 스타일
         link:
           "bg-transparent text-[#3182F6] underline-offset-4 hover:underline hover:text-[#4D95FF]",

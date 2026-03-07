@@ -61,8 +61,8 @@ const config: Config = {
           "card-hover": "#1E2535",
           border: "#242D3D",
           text1: "#F0F4FF",
-          text2: "#8B96A9",
-          text3: "#4E5C72",
+          text2: "#A0AEBF",
+          text3: "#6B7A8D",
         },
       },
       borderRadius: {

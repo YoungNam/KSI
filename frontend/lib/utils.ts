@@ -37,7 +37,7 @@ export function formatChange(value: number): string {
 export function getChangeColor(value: number): string {
   if (value > 0) return "text-[#05C075]";
   if (value < 0) return "text-[#F04452]";
-  return "text-[#8B96A9]";
+  return "text-[#A0AEBF]";
 }
 
 /**

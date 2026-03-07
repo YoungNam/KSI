@@ -72,7 +72,7 @@ function IndexCard({
   return (
     <Card className="p-6 hover:border-[#3182F6]/40 transition-colors duration-200">
       {/* 레이블 */}
-      <p className="text-xs font-medium text-[#8B96A9] uppercase tracking-wide mb-3">
+      <p className="text-xs font-medium text-[#A0AEBF] uppercase tracking-wide mb-3">
         {label}
       </p>
       {/* 주요 수치 — 지수값 */}
@@ -86,9 +86,9 @@ function IndexCard({
       </div>
       {/* 거래대금 (있을 때만 표시) */}
       {volume !== undefined && volume !== "—" && (
-        <p className="text-xs text-[#4E5C72] mt-3 tabular-nums">
+        <p className="text-xs text-[#6B7A8D] mt-3 tabular-nums">
           거래대금{" "}
-          <span className="text-[#8B96A9]">{volume}</span>
+          <span className="text-[#A0AEBF]">{volume}</span>
         </p>
       )}
       {/* 상승/하락 배경 인디케이터 */}
@@ -99,7 +99,7 @@ function IndexCard({
             ? "bg-[#05C075]"
             : isNegative
             ? "bg-[#F04452]"
-            : "bg-[#8B96A9]",
+            : "bg-[#A0AEBF]",
         ].join(" ")}
         aria-hidden
       />
@@ -118,13 +118,13 @@ function FlowCard({ label, value }: { label: string; value: string }) {
     ? "text-[#05C075]"
     : isNegative
     ? "text-[#F04452]"
-    : "text-[#8B96A9]";
+    : "text-[#A0AEBF]";
   const TrendIcon = isPositive ? TrendingUp : isNegative ? TrendingDown : Minus;
 
   return (
     <Card className="p-6 hover:border-[#3182F6]/40 transition-colors duration-200">
       {/* 레이블 */}
-      <p className="text-xs font-medium text-[#8B96A9] uppercase tracking-wide mb-3">
+      <p className="text-xs font-medium text-[#A0AEBF] uppercase tracking-wide mb-3">
         {label} 순매수
       </p>
       {/* 수급 금액 */}
@@ -132,7 +132,7 @@ function FlowCard({ label, value }: { label: string; value: string }) {
         <TrendIcon className="w-5 h-5 flex-shrink-0" />
         <span className="text-3xl font-bold tabular-nums">{value}</span>
       </div>
-      <p className="text-xs text-[#4E5C72] mt-2">KOSPI + KOSDAQ 합산</p>
+      <p className="text-xs text-[#6B7A8D] mt-2">KOSPI + KOSDAQ 합산</p>
     </Card>
   );
 }
@@ -182,7 +182,7 @@ function MarketScoreGauge({ score }: { score: number }) {
         >
           {score}
         </span>
-        <span className="text-xs text-[#8B96A9] mt-1.5 font-medium">
+        <span className="text-xs text-[#A0AEBF] mt-1.5 font-medium">
           / 100
         </span>
       </div>
@@ -211,7 +211,7 @@ function MarketScoreCard({
   return (
     <Card className="p-6">
       {/* 헤더 */}
-      <p className="text-xs font-medium text-[#8B96A9] uppercase tracking-wide mb-4">
+      <p className="text-xs font-medium text-[#A0AEBF] uppercase tracking-wide mb-4">
         시장 점수
       </p>
 
@@ -229,15 +229,15 @@ function MarketScoreCard({
       {/* 기술 지표 그리드 */}
       {indicators && Object.entries(indicators).length > 0 && (
         <div className="mt-4 pt-4 border-t border-[#242D3D]">
-          <p className="text-xs text-[#4E5C72] font-medium mb-3">기술 지표</p>
+          <p className="text-xs text-[#6B7A8D] font-medium mb-3">기술 지표</p>
           <div className="grid grid-cols-2 gap-y-2.5 gap-x-4">
             {Object.entries(indicators)
               .slice(0, 6)
               .map(([key, val]) => (
                 <div key={key} className="flex justify-between items-center">
-                  <span className="text-xs text-[#8B96A9]">{key}</span>
+                  <span className="text-xs text-[#A0AEBF]">{key}</span>
                   <span className="text-xs font-semibold text-[#F0F4FF] tabular-nums">
-                    {String(val)}
+                    {typeof val === "number" ? formatNumber(val, 2) : String(val)}
                   </span>
                 </div>
               ))}
@@ -247,7 +247,7 @@ function MarketScoreCard({
 
       {/* 분석 시각 */}
       {generatedAt && (
-        <p className="text-[11px] text-[#4E5C72] mt-3">
+        <p className="text-[11px] text-[#6B7A8D] mt-3">
           분석 {formatDateKo(generatedAt)}
         </p>
       )}
@@ -269,7 +269,7 @@ function MarketPhaseCard({
 
   return (
     <Card className="p-6">
-      <p className="text-xs font-medium text-[#8B96A9] uppercase tracking-wide mb-4">
+      <p className="text-xs font-medium text-[#A0AEBF] uppercase tracking-wide mb-4">
         시장 국면
       </p>
 
@@ -281,7 +281,7 @@ function MarketPhaseCard({
 
       {/* 투자 스탠스 */}
       <div className="mt-4 pt-4 border-t border-[#242D3D]">
-        <p className="text-xs text-[#8B96A9] mb-1">투자 스탠스</p>
+        <p className="text-xs text-[#A0AEBF] mb-1">투자 스탠스</p>
         <p className="text-sm font-semibold text-[#F0F4FF]">{stance}</p>
       </div>
     </Card>
@@ -302,20 +302,20 @@ function MarketIndicatorsCard({
 }) {
   return (
     <Card className="p-6">
-      <p className="text-xs font-medium text-[#8B96A9] uppercase tracking-wide mb-4">
+      <p className="text-xs font-medium text-[#A0AEBF] uppercase tracking-wide mb-4">
         시장 지표
       </p>
 
       {/* 거래량 */}
       <div className="space-y-3">
         <div className="flex justify-between items-center">
-          <span className="text-sm text-[#8B96A9]">KOSPI 거래대금</span>
+          <span className="text-sm text-[#A0AEBF]">KOSPI 거래대금</span>
           <span className="text-sm font-semibold text-[#F0F4FF] tabular-nums">
             {kospiVolume}
           </span>
         </div>
         <div className="flex justify-between items-center">
-          <span className="text-sm text-[#8B96A9]">KOSDAQ 거래대금</span>
+          <span className="text-sm text-[#A0AEBF]">KOSDAQ 거래대금</span>
           <span className="text-sm font-semibold text-[#F0F4FF] tabular-nums">
             {kosdaqVolume}
           </span>
@@ -325,14 +325,14 @@ function MarketIndicatorsCard({
       {/* 기술 지표 */}
       {indicators && Object.entries(indicators).length > 0 && (
         <div className="mt-4 pt-4 border-t border-[#242D3D] space-y-2.5">
-          <p className="text-xs text-[#4E5C72] font-medium">기술 지표</p>
+          <p className="text-xs text-[#6B7A8D] font-medium">기술 지표</p>
           {Object.entries(indicators)
             .slice(0, 4)
             .map(([key, val]) => (
               <div key={key} className="flex justify-between items-center">
-                <span className="text-xs text-[#8B96A9]">{key}</span>
+                <span className="text-xs text-[#A0AEBF]">{key}</span>
                 <span className="text-xs font-semibold text-[#F0F4FF] tabular-nums">
-                  {String(val)}
+                  {typeof val === "number" ? formatNumber(val, 2) : String(val)}
                 </span>
               </div>
             ))}
@@ -370,7 +370,7 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-bold text-[#F0F4FF] leading-tight">
             시장 현황
           </h1>
-          <p className="text-sm text-[#8B96A9] mt-0.5">
+          <p className="text-sm text-[#A0AEBF] mt-0.5">
             KOSPI · KOSDAQ 실시간 대시보드
           </p>
         </div>
@@ -383,7 +383,7 @@ export default function DashboardPage() {
               "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium",
               realtimeConnected
                 ? "border-[#05C075]/25 bg-[#05C075]/10 text-[#05C075]"
-                : "border-[#242D3D] bg-[#1E2535] text-[#8B96A9]",
+                : "border-[#242D3D] bg-[#1E2535] text-[#A0AEBF]",
             ].join(" ")}
           >
             {realtimeConnected ? (
@@ -401,7 +401,7 @@ export default function DashboardPage() {
 
           {/* 마지막 갱신 시각 */}
           {lastUpdated && (
-            <span className="text-xs text-[#4E5C72] hidden md:flex items-center gap-1">
+            <span className="text-xs text-[#6B7A8D] hidden md:flex items-center gap-1">
               <Activity className="w-3 h-3" />
               {lastUpdated.toLocaleTimeString("ko-KR", {
                 hour: "2-digit",

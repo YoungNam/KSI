@@ -79,7 +79,7 @@ export function WatchlistSection() {
       {/* 헤더 */}
       <div className="flex items-center gap-2 mb-5">
         <Star className="w-4 h-4 text-[#F5A623]" />
-        <h2 className="text-sm font-semibold text-[#8B96A9] uppercase tracking-wide">
+        <h2 className="text-sm font-semibold text-[#A0AEBF] uppercase tracking-wide">
           관심종목 현황
         </h2>
       </div>
@@ -97,8 +97,8 @@ export function WatchlistSection() {
       {!loading && items.length === 0 && (
         <div className="py-8 text-center">
           <Star className="w-8 h-8 text-[#242D3D] mx-auto mb-3" />
-          <p className="text-sm text-[#4E5C72]">등록된 관심종목이 없습니다.</p>
-          <p className="text-xs text-[#4E5C72] mt-1">
+          <p className="text-sm text-[#6B7A8D]">등록된 관심종목이 없습니다.</p>
+          <p className="text-xs text-[#6B7A8D] mt-1">
             <a
               href="/watchlist"
               className="text-[#3182F6] hover:underline underline-offset-2"
@@ -117,7 +117,7 @@ export function WatchlistSection() {
             const price = item.priceData?.current_price ?? null;
             const changeRate = item.priceData?.change_rate ?? null;
             const colorClass =
-              changeRate !== null ? getChangeColor(changeRate) : "text-[#8B96A9]";
+              changeRate !== null ? getChangeColor(changeRate) : "text-[#A0AEBF]";
 
             return (
               <div
@@ -133,12 +133,12 @@ export function WatchlistSection() {
                     </span>
                     <Badge
                       variant="outline"
-                      className="text-[10px] px-1.5 py-0 border-[#242D3D] text-[#8B96A9] shrink-0"
+                      className="text-[10px] px-1.5 py-0 border-[#242D3D] text-[#A0AEBF] shrink-0"
                     >
                       {item.market}
                     </Badge>
                   </div>
-                  <p className="text-xs text-[#4E5C72] mt-0.5 tabular-nums">
+                  <p className="text-xs text-[#6B7A8D] mt-0.5 tabular-nums">
                     {item.ticker}
                   </p>
                 </div>

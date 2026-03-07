@@ -68,7 +68,7 @@ def _ctx_to_content(ctx: BriefingContext) -> dict:
 def _merge_watchlist_stocks(
     watchlist_tickers: list[str],
     featured: list[StockCandidate],
-    top_n: int = 8,
+    top_n: int = 7,
 ) -> list[StockCandidate]:
     """
     관심 종목(watchlist)과 특징주를 합칩니다.

@@ -27,6 +27,17 @@ import { formatDateKo } from "@/lib/utils";
 /** 리포트 타입 정의 */
 type ReportType = "morning" | "open" | "close" | "evening";
 
+/** KST 시간 기준 브리핑 타입 자동 결정 */
+function getReportTypeByTime(): ReportType {
+  // KST = UTC+9
+  const now = new Date();
+  const kstHour = (now.getUTCHours() + 9) % 24;
+  if (kstHour < 9) return "morning";
+  if (kstHour < 16) return "open";
+  if (kstHour < 21) return "close";
+  return "evening";
+}
+
 /** 리포트 탭 메타데이터 */
 const reportTabs: {
   value: ReportType;
@@ -69,7 +80,13 @@ const reportTypeLabel: Record<string, string> = {
 };
 
 /** 단일 리포트 뷰어 컴포넌트 */
-function ReportViewer({ reportType }: { reportType: ReportType }) {
+function ReportViewer({
+  reportType,
+  onTabChange,
+}: {
+  reportType: ReportType;
+  onTabChange?: (tab: ReportType) => void;
+}) {
   const [report, setReport] = useState<LatestReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -114,7 +131,13 @@ function ReportViewer({ reportType }: { reportType: ReportType }) {
     setRunning(true);
     setRunMessage(null);
     try {
-      const result = await runBriefing(reportType);
+      // 시간 기반으로 브리핑 타입 자동 결정
+      const autoType = getReportTypeByTime();
+      const result = await runBriefing(autoType);
+      // 해당 타입 탭으로 자동 전환
+      if (onTabChange && autoType !== reportType) {
+        onTabChange(autoType);
+      }
       setRunMessage("브리핑 실행 중...");
 
       // 실행 전 파일 수정 시각 기억 (날짜 대신 mtime으로 비교)
@@ -199,7 +222,7 @@ function ReportViewer({ reportType }: { reportType: ReportType }) {
           className="gap-2"
         >
           <Play className="w-4 h-4" />
-          {running ? "실행 중..." : "브리핑 즉시 실행"}
+          {running ? "실행 중..." : `${reportTypeLabel[getReportTypeByTime()] ?? ""} 브리핑 즉시 실행`}
         </Button>
       </div>
 
@@ -397,7 +420,7 @@ export default function ReportsPage() {
 
             {reportTabs.map((tab) => (
               <TabsContent key={tab.value} value={tab.value}>
-                <ReportViewer reportType={tab.value} />
+                <ReportViewer reportType={tab.value} onTabChange={setActiveTab} />
               </TabsContent>
             ))}
           </Tabs>

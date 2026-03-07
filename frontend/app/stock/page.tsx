@@ -189,6 +189,7 @@ export default function StockPage() {
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasScanned, setHasScanned] = useState(false);
 
   /** 현재 선택된 시장의 특징주 스캔 */
   const loadStocks = useCallback(
@@ -198,6 +199,7 @@ export default function StockPage() {
       try {
         const result = await fetchFeaturedStocks(market, 20);
         setData((prev) => ({ ...prev, [market]: result }));
+        setHasScanned(true);
       } catch (err) {
         setError(
           err instanceof Error
@@ -211,18 +213,12 @@ export default function StockPage() {
     []
   );
 
-  // 탭 변경 시 해당 시장 데이터 없으면 로드
+  // 탭 변경 시 해당 시장 데이터 없으면 로드 (첫 스캔 이후에만)
   useEffect(() => {
-    if (!data[activeMarket]) {
+    if (hasScanned && !data[activeMarket]) {
       loadStocks(activeMarket);
     }
-  }, [activeMarket, data, loadStocks]);
-
-  // 마운트 시 ALL 데이터 초기 로드
-  useEffect(() => {
-    loadStocks("ALL");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [activeMarket, data, loadStocks, hasScanned]);
 
   const currentData = data[activeMarket];
 
@@ -363,10 +359,13 @@ function StockTabContent({
   if (!data) {
     return (
       <Card>
-        <CardContent className="py-12 text-center">
-          <Search className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+        <CardContent className="py-16 text-center">
+          <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <p className="text-base font-medium text-foreground mb-1">
+            종목 스캔 대기 중
+          </p>
           <p className="text-sm text-muted-foreground">
-            &quot;스캔 실행&quot; 버튼을 눌러 종목을 스캔하세요.
+            우측 상단의 &quot;스캔 실행&quot; 버튼을 눌러 AI 특징주를 스캔하세요.
           </p>
         </CardContent>
       </Card>

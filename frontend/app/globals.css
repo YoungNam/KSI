@@ -28,11 +28,11 @@
 
     /* Secondary */
     --secondary: 220 22% 15%;        /* #1E2535 */
-    --secondary-foreground: 220 20% 67%; /* #8B96A9 */
+    --secondary-foreground: 215 16% 69%; /* #A0AEBF */
 
     /* Muted */
     --muted: 220 20% 17%;            /* #242D3D */
-    --muted-foreground: 220 15% 55%; /* #8B96A9 */
+    --muted-foreground: 215 16% 69%; /* #A0AEBF */
 
     /* Accent */
     --accent: 220 22% 15%;
@@ -83,7 +83,7 @@
   border-radius: 99px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #4e5c72;
+  background: #6b7a8d;
 }
 
 /* 마크다운 렌더링 스타일 — Toss 다크 테마 */
@@ -123,7 +123,7 @@
 }
 .markdown-body th {
   background: #1e2535;
-  color: #8b96a9;
+  color: #a0aebf;
   font-weight: 600;
   padding: 8px 12px;
   text-align: left;
@@ -150,7 +150,7 @@
   border-left: 3px solid #3182f6;
   padding-left: 1rem;
   margin: 0.75rem 0;
-  color: #8b96a9;
+  color: #a0aebf;
   font-style: italic;
 }
 .markdown-body code {

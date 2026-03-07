@@ -18,7 +18,7 @@ const badgeVariants = cva(
           "bg-[#3182F6]/15 text-[#3182F6] border-[#3182F6]/25",
         // Secondary — muted 톤
         secondary:
-          "bg-[#1E2535] text-[#8B96A9] border-[#242D3D]",
+          "bg-[#1E2535] text-[#A0AEBF] border-[#242D3D]",
         // Outline — 테두리만
         outline:
           "bg-transparent text-[#F0F4FF] border-[#242D3D]",
