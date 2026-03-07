@@ -1,6 +1,6 @@
 # KSI Handoff — Korean Stock Intelligence
-> 마지막 업데이트: 2026-03-07 (2차)
-> 상태: **운영 중** — Vercel (FE) + Railway (BE) 배포 완료 / pykrx 런타임 오류 미해결
+> 마지막 업데이트: 2026-03-07 (3차)
+> 상태: **운영 중** — Vercel (FE) + Railway (BE) 배포 완료 / 에이전트 구조 최적화 완료
 
 ---
 
@@ -20,7 +20,7 @@
 | Frontend | Next.js 15 (App Router) + TypeScript + Tailwind CSS + shadcn/ui + Recharts |
 | Backend | FastAPI (Python 3.12+) + APScheduler |
 | Database | Supabase (PostgreSQL + Realtime) |
-| Data | pykrx, FinanceDataReader |
+| Data | FinanceDataReader (주력), pykrx (fallback) |
 | AI | Claude API (`claude-sonnet-4-6`), Gemini API (`gemini-2.0-flash`) |
 | Deploy | Vercel (FE) + Railway (BE) + Cloudflare (DNS) |
 
@@ -32,35 +32,34 @@
 
 ```
 backend/
+├── models.py                   ← 공유 dataclass 5개 (GlobalMarket, KoreanMarket, NewsItem, StockCandidate, MarketAnalysis)
 ├── agents/
-│   ├── market_analyst.py     ← pykrx + FinanceDataReader → MarketAnalysis
-│   ├── news_monitor.py       ← Gemini API → list[NewsItem]
-│   ├── stock_picker.py       ← pykrx 특징주 스캔 → list[StockCandidate]
-│   ├── strategy_generator.py ← Claude API → strategy_YYYY-MM-DD.json
-│   └── report_writer.py      ← 4종 Markdown 브리핑 생성·저장
+│   ├── market_analyst.py       ← FDR + 기술지표 → MarketAnalysis
+│   ├── news_monitor.py         ← Gemini API → list[NewsItem]
+│   ├── stock_picker.py         ← FDR 특징주 스캔 → list[StockCandidate]
+│   └── strategy_generator.py   ← Claude API → strategy_YYYY-MM-DD.json
 ├── data/
-│   └── market_data.py        ← fetch_korean_market() / fetch_global_market()
+│   └── market_data.py          ← fetch_korean_market() / fetch_global_market()
 ├── api/v1/
-│   └── router.py             ← 6개 엔드포인트 구현 완료
+│   └── router.py               ← API 엔드포인트
 ├── scheduler/
-│   └── tasks.py              ← 4회 브리핑 자동 파이프라인 연결
-└── main.py                   ← FastAPI 앱 + CORS + Lifespan
+│   └── tasks.py                ← 4회 스케줄 → Supabase 직접 저장 (md 생성 없음)
+└── main.py                     ← FastAPI 앱 + CORS + Lifespan
 ```
 
 #### 에이전트 파이프라인 흐름
 
 | 시각 | 파이프라인 |
 |------|-----------|
-| 07:00 | market_analyst → news(global+domestic) → stock_picker → strategy_generator → report_writer(morning) |
-| 09:10 | market_analyst(실시간) → stock_picker → news(domestic) → report_writer(open) |
-| 16:10 | market_analyst(마감) → stock_picker → news(domestic) → tomorrow_events → report_writer(close) |
-| 21:00 | market_analyst → news_monitor(evening, 단일 호출) → strategy_generator → report_writer(evening) |
+| 07:00 | market_analyst → news(global+domestic) → stock_picker → strategy_generator → Supabase 저장 |
+| 09:10 | market_analyst(실시간) → stock_picker → news(domestic) → Supabase 저장 |
+| 16:10 | market_analyst(마감) → stock_picker → news(domestic) → tomorrow_events → Supabase 저장 |
+| 21:00 | market_analyst → Gemini(evening) → strategy_generator → Supabase 저장 |
 
-#### 브리핑 포맷 (4종)
-- **morning** (`morning_YYYY-MM-DD.md`): 글로벌 동향 → 이슈 → 한국 전망 → 관심종목 TOP5 → 투자 전략
-- **open** (`open_YYYY-MM-DD.md`): 개장 현황 → 외국인·기관 수급 → 특징주 → 단기 매매 포인트
-- **close** (`close_YYYY-MM-DD.md`): 마감 현황 → 수급 결산 → 섹터 → 종목 결산 → 내일 포인트
-- **evening** (`evening_YYYY-MM-DD.md`): 미국 선물 → 글로벌 이슈(영향도) → 익일 이벤트 → 익일 전략
+#### 리포트 저장 방식
+- .md 파일 생성 **제거됨** (report_writer.py 삭제)
+- Supabase `market_reports` 테이블에 JSON으로 직접 저장
+- `_build_report_content()` 함수가 JSONB 딕셔너리 구성
 
 ### API 엔드포인트 (모두 구현 완료)
 
@@ -153,17 +152,9 @@ npm run dev   # localhost:3000
 ### ✅ 해결됨 (2026-03-07)
 
 1. **pykrx `pkg_resources` 런타임 오류** → FinanceDataReader(Yahoo Finance)로 대체
-   - `router.py`: `/stocks/{ticker}/price` → FDR DataReader 사용
-   - `market_data.py`: 인덱스 데이터 → FDR `^KS11`/`^KQ11` 사용, 수급·거래대금은 pykrx fallback
-   - `market_analyst.py`: 기술 지표 계산 → FDR 우선, pykrx fallback
-   - `stock_picker.py`: 시장 스캔 → pykrx 우선, FDR fallback (주요 종목 하드코딩 포함)
-
-### 🔴 미해결 이슈
-
-2. **브리핑 파일 미생성**
-   - 증상: `/reports` 페이지에서 `404 브리핑 파일이 없습니다`
-   - 원인: 스케줄러가 아직 실행 시간에 도달하지 않음 (Railway 재배포마다 초기화)
-   - 해결: `/reports` 페이지에서 "브리핑 즉시 실행" 버튼으로 수동 생성
+2. **에이전트 구조 최적화** → `models.py` 분리, `report_writer.py` 삭제, 스케줄러 단순화
+   - 브리핑 페이지(FE) + 브리핑 API(BE) + report_writer 모두 제거
+   - .md 파일 생성 없음, Supabase JSON 저장만 유지
 
 ### 🔴 운영 환경 설정 필요 (코드 변경 없음)
 
@@ -187,7 +178,6 @@ npm run dev   # localhost:3000
 ├── news-monitor.md         ← Gemini MCP 뉴스 수집
 ├── stock-picker.md         ← 특징주 스캔
 ├── strategy-generator.md   ← 투자 전략 생성
-├── report-writer.md        ← 브리핑 리포트 생성 (포맷 명세 포함)
 ├── frontend-dev.md         ← Next.js UI 구현
 ├── backend-dev.md          ← FastAPI 구현
 └── devops.md               ← 배포 설정
@@ -202,9 +192,9 @@ npm run dev   # localhost:3000
 - `foreign_net`, `institution_net`: **string** (`"+2,345억"` 또는 `"—"`) — 수급 포맷팅 값
 - `market_score`: **int** (0~100) — 기술 지표 기반 종합 점수
 
-### 브리핑 파일 저장 경로
-- `backend/reports/{type}_{YYYY-MM-DD}.md` (Markdown)
+### 파일 저장 경로
 - `backend/reports/strategy_{YYYY-MM-DD}.json` (전략 JSON)
+- 브리핑 .md 파일은 더 이상 생성하지 않음 (Supabase JSONB로 대체)
 
 ### CORS 설정
 - `allow_origin_regex=r"http://localhost:\d+"` — 개발 환경 전체 허용
