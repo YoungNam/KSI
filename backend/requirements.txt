@@ -8,8 +8,8 @@ python-dotenv==1.0.1
 # 스케줄러
 apscheduler==3.10.4
 
-# 패키징 유틸 (pykrx 의존성)
-setuptools>=65.5.0
+# 패키징 유틸
+setuptools>=70.0.0
 beautifulsoup4>=4.12.0
 lxml>=4.9.0
 

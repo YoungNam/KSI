@@ -424,8 +424,13 @@ async def debug_pykrx():
     except Exception as e:
         results["fdr_listing"] = f"FAIL: {e}"
 
-    # 9. Python 버전
+    # 9. 버전 정보
     import sys
     results["python"] = sys.version
+    try:
+        import pykrx
+        results["pykrx_version"] = getattr(pykrx, "__version__", "unknown")
+    except Exception:
+        results["pykrx_version"] = "N/A"
 
     return results
