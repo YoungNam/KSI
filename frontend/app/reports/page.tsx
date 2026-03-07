@@ -95,7 +95,7 @@ function ReportViewer({
   const [polling, setPolling] = useState(false);
   const intervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
 
-  /** 리포트 로드 */
+  /** 리포트 로드 — 404는 빈 상태로 처리 */
   const loadReport = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -103,9 +103,13 @@ function ReportViewer({
       const data = await fetchLatestReport(reportType);
       setReport(data);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "리포트를 불러오지 못했습니다."
-      );
+      if (err instanceof Error && err.message.includes("404")) {
+        setReport(null);
+      } else {
+        setError(
+          err instanceof Error ? err.message : "리포트를 불러오지 못했습니다."
+        );
+      }
     } finally {
       setLoading(false);
     }
