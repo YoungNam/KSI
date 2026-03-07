@@ -165,25 +165,85 @@ async def get_featured_stocks(
 @router.get("/strategy/today")
 async def get_today_strategy():
     """
-    오늘 날짜의 투자 전략 JSON 반환.
-    파일이 없으면 404 반환 (스케줄러 또는 /briefing/run 으로 생성).
+    최신 투자 전략 JSON 반환.
+    당일 전략이 없으면 가장 최근 전략을 is_stale=true와 함께 반환.
+    전략 파일이 전혀 없으면 404.
     """
     path = _latest_strategy_path()
     if path is None:
         raise HTTPException(
             status_code=404,
-            detail="전략 파일이 없습니다. 모닝 브리핑 실행 후 다시 시도하세요.",
+            detail="전략 파일이 없습니다. '전략 생성' 버튼으로 생성하세요.",
         )
 
     try:
         content = json.loads(path.read_text(encoding="utf-8"))
+        # 당일 전략인지 확인
+        strategy_date = content.get("strategy_date", "")
+        is_stale = strategy_date != date.today().isoformat()
         return {
-            "strategy_date": content.get("strategy_date"),
+            "strategy_date": strategy_date,
             "file": path.name,
             "data": content,
+            "is_stale": is_stale,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"전략 파일 읽기 실패: {str(e)}")
+
+
+# 전략 생성 태스크 상태 추적
+_strategy_status: dict[str, str] = {"status": "idle"}
+
+
+@router.post("/strategy/generate")
+async def generate_strategy_now(background_tasks: BackgroundTasks):
+    """
+    전략을 독립적으로 즉시 생성 (백그라운드 태스크).
+    모닝 브리핑 없이도 시장분석 → 뉴스수집 → 특징주스캔 → 전략생성을 수행.
+    실행 상태는 GET /strategy/status 로 폴링.
+    """
+    if _strategy_status.get("status") == "running":
+        return {"message": "전략 생성이 이미 진행 중입니다.", "status": "running"}
+
+    def _run():
+        _strategy_status["status"] = "running"
+        try:
+            from agents.market_analyst import analyze_market
+            from agents.news_monitor import fetch_news
+            from agents.stock_picker import scan_featured_stocks
+            from agents.strategy_generator import run_strategy
+            from db.supabase import fetch_watchlist_tickers, save_daily_strategy
+            from scheduler.tasks import _merge_watchlist_stocks
+
+            print("[strategy/generate] ─── 독립 전략 생성 시작 ───")
+            # 1. 시장 분석
+            analysis = analyze_market()
+            # 2. 뉴스 수집
+            news = fetch_news("global") + fetch_news("domestic")
+            # 3. 특징주 + 관심 종목 병합
+            featured = scan_featured_stocks("ALL", top_n=5)
+            watchlist_tickers = fetch_watchlist_tickers()
+            stocks = _merge_watchlist_stocks(watchlist_tickers, featured)
+            # 4. 전략 생성 + 저장
+            strategy = run_strategy(analysis, news, stocks)
+            save_daily_strategy(strategy)
+            _strategy_status["status"] = "done"
+            print("[strategy/generate] ─── 독립 전략 생성 완료 ───")
+        except Exception as e:
+            _strategy_status["status"] = f"failed: {str(e)[:120]}"
+            print(f"[strategy/generate] 실패: {e}")
+
+    background_tasks.add_task(_run)
+    return {
+        "message": "전략 생성이 백그라운드에서 시작됐습니다.",
+        "started_at": datetime.now().isoformat(),
+    }
+
+
+@router.get("/strategy/status")
+async def get_strategy_status():
+    """전략 생성 태스크 실행 상태 조회 (idle | running | done | failed: ...)"""
+    return {"status": _strategy_status.get("status", "idle")}
 
 
 @router.get("/reports/latest", response_model=ReportResponse)

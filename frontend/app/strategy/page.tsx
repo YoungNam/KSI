@@ -29,7 +29,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { fetchTodayStrategy, type TodayStrategy, type KeyStock } from "@/lib/api";
+import {
+  fetchTodayStrategy,
+  generateStrategy,
+  fetchStrategyStatus,
+  type TodayStrategy,
+  type KeyStock,
+} from "@/lib/api";
 import { getPhaseColor } from "@/lib/utils";
 
 /** position_weights 영문 키 → 한국어 레이블 매핑 */
@@ -217,6 +223,9 @@ export default function StrategyPage() {
   const [strategy, setStrategy] = useState<TodayStrategy | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [genMessage, setGenMessage] = useState<string | null>(null);
+  const intervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadStrategy = useCallback(async () => {
     setLoading(true);
@@ -225,9 +234,14 @@ export default function StrategyPage() {
       const data = await fetchTodayStrategy();
       setStrategy(data);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "전략 데이터를 불러오지 못했습니다."
-      );
+      // 404는 전략 없음 — 에러 대신 빈 상태로 처리
+      if (err instanceof Error && err.message.includes("404")) {
+        setStrategy(null);
+      } else {
+        setError(
+          err instanceof Error ? err.message : "전략 데이터를 불러오지 못했습니다."
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -235,35 +249,158 @@ export default function StrategyPage() {
 
   useEffect(() => {
     loadStrategy();
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
   }, [loadStrategy]);
 
+  /** 전략 독립 생성 — 폴링으로 완료 감지 */
+  async function handleGenerateStrategy() {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+
+    setGenerating(true);
+    setGenMessage(null);
+    setError(null);
+    try {
+      await generateStrategy();
+      setGenMessage("전략 생성 중...");
+
+      const MAX_ATTEMPTS = 60; // 최대 5분 (5초 × 60)
+      let attempt = 0;
+
+      intervalRef.current = setInterval(async () => {
+        attempt++;
+        try {
+          const { status } = await fetchStrategyStatus();
+          if (status.startsWith("failed")) {
+            setGenMessage(`전략 생성 실패: ${status.replace("failed: ", "")}`);
+            clearInterval(intervalRef.current!);
+            intervalRef.current = null;
+            setGenerating(false);
+            return;
+          }
+          if (status === "done") {
+            setGenMessage(null);
+            clearInterval(intervalRef.current!);
+            intervalRef.current = null;
+            setGenerating(false);
+            loadStrategy();
+            return;
+          }
+          setGenMessage(`전략 생성 중... (${attempt * 5}초 경과)`);
+        } catch {
+          // 일시적 네트워크 오류 — 계속 대기
+        }
+        if (attempt >= MAX_ATTEMPTS) {
+          clearInterval(intervalRef.current!);
+          intervalRef.current = null;
+          setGenerating(false);
+          setGenMessage("전략 생성 시간 초과 — 새로고침 후 확인하세요.");
+        }
+      }, 5000);
+    } catch (err) {
+      setGenMessage(
+        err instanceof Error ? err.message : "전략 생성 요청에 실패했습니다."
+      );
+      setGenerating(false);
+    }
+  }
+
   const phaseColors = strategy ? getPhaseColor(strategy.data.market_phase) : null;
+  const isEmpty = !loading && !strategy;
+  const isStale = strategy?.is_stale === true;
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       {/* 페이지 헤더 */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">투자 전략</h1>
           <p className="text-sm text-muted-foreground mt-1">AI 기반 오늘의 투자 전략</p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={loadStrategy}
-          disabled={loading}
-          className="gap-2"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          새로고침
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            onClick={handleGenerateStrategy}
+            disabled={generating}
+            className="gap-2"
+          >
+            {generating ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                생성 중...
+              </>
+            ) : (
+              <>
+                <TrendingUp className="w-4 h-4" />
+                전략 생성
+              </>
+            )}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadStrategy}
+            disabled={loading}
+            className="gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            새로고침
+          </Button>
+        </div>
       </div>
+
+      {/* 전략 생성 상태 메시지 */}
+      {genMessage && (
+        <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 text-sm text-primary flex items-center gap-2">
+          {generating && (
+            <span className="w-3 h-3 rounded-full border-2 border-primary border-t-transparent animate-spin flex-shrink-0" />
+          )}
+          {genMessage}
+        </div>
+      )}
+
+      {/* 이전 날짜 전략 안내 배너 */}
+      {isStale && (
+        <div className="rounded-lg border border-[#F5A623]/30 bg-[#F5A623]/10 px-4 py-3 text-sm text-[#F5A623] flex items-center gap-2">
+          <Clock className="w-4 h-4 flex-shrink-0" />
+          <span>
+            {strategy.strategy_date} 기준 전략입니다. &quot;전략 생성&quot; 버튼으로 최신 전략을 생성하세요.
+          </span>
+        </div>
+      )}
 
       {/* 에러 */}
       {error && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
           {error}
         </div>
+      )}
+
+      {/* 전략 없음 — CTA */}
+      {isEmpty && !error && (
+        <Card>
+          <CardContent className="py-16 text-center">
+            <TrendingUp className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-base font-medium text-foreground mb-1">
+              생성된 투자 전략이 없습니다
+            </p>
+            <p className="text-sm text-muted-foreground mb-5">
+              &quot;전략 생성&quot; 버튼을 눌러 현재 시장 기반 AI 투자 전략을 생성하세요.
+            </p>
+            <Button
+              onClick={handleGenerateStrategy}
+              disabled={generating}
+              className="gap-2"
+            >
+              <TrendingUp className="w-4 h-4" />
+              {generating ? "생성 중..." : "전략 생성하기"}
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
       {/* 로딩 스켈레톤 */}

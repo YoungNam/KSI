@@ -90,6 +90,7 @@ export interface TodayStrategy {
   strategy_date: string;
   file: string;
   data: StrategyData;
+  is_stale?: boolean; // 당일 전략이 아닌 경우 true
 }
 
 /** 개별 종목 주가 포인트 */
@@ -222,6 +223,24 @@ export async function fetchStockPrice(
   return apiFetch<StockPrice>(
     `/api/v1/stocks/${ticker}/price?days=${days}`
   );
+}
+
+/**
+ * 전략 독립 생성 요청
+ * POST /api/v1/strategy/generate
+ */
+export async function generateStrategy(): Promise<{ message: string }> {
+  return apiFetch<{ message: string }>("/api/v1/strategy/generate", {
+    method: "POST",
+  });
+}
+
+/**
+ * 전략 생성 상태 조회
+ * GET /api/v1/strategy/status → "idle" | "running" | "done" | "failed: ..."
+ */
+export async function fetchStrategyStatus(): Promise<{ status: string }> {
+  return apiFetch<{ status: string }>("/api/v1/strategy/status");
 }
 
 /**
