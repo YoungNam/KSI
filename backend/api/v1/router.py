@@ -356,3 +356,52 @@ async def run_briefing_now(
         "briefing_type": req.briefing_type,
         "started_at": datetime.now().isoformat(),
     }
+
+
+@router.get("/debug/pykrx")
+async def debug_pykrx():
+    """pykrx 동작 여부 진단 (임시)"""
+    results = {}
+
+    # 1. pkg_resources import 테스트
+    try:
+        import pkg_resources
+        results["pkg_resources"] = f"OK (v{pkg_resources.__version__})"
+    except Exception as e:
+        results["pkg_resources"] = f"FAIL: {e}"
+
+    # 2. setuptools 확인
+    try:
+        import setuptools
+        results["setuptools"] = f"OK (v{setuptools.__version__})"
+    except Exception as e:
+        results["setuptools"] = f"FAIL: {e}"
+
+    # 3. pykrx import 테스트
+    try:
+        from pykrx import stock
+        results["pykrx_import"] = "OK"
+    except Exception as e:
+        results["pykrx_import"] = f"FAIL: {e}"
+
+    # 4. pykrx 데이터 조회 테스트
+    try:
+        from pykrx import stock
+        df = stock.get_index_ohlcv("20260301", "20260307", "1001")
+        results["pykrx_data"] = f"OK ({len(df)} rows)"
+    except Exception as e:
+        results["pykrx_data"] = f"FAIL: {e}"
+
+    # 5. FDR StockListing 테스트
+    try:
+        import FinanceDataReader as fdr
+        listing = fdr.StockListing("KOSPI")
+        results["fdr_listing"] = f"OK ({len(listing)} rows)"
+    except Exception as e:
+        results["fdr_listing"] = f"FAIL: {e}"
+
+    # 6. Python 버전
+    import sys
+    results["python"] = sys.version
+
+    return results
