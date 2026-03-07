@@ -11,8 +11,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/** 사이드바 네비게이션 항목 정의 */
-const navItems = [
+/** 네비게이션 항목 정의 (사이드바 + 모바일 하단바 공용) */
+export const navItems = [
   {
     href: "/dashboard",
     label: "대시보드",
@@ -79,7 +79,7 @@ export function Sidebar({ className }: SidebarProps) {
           <p className="text-sm font-bold text-[#F0F4FF] leading-none tracking-tight">
             KSI
           </p>
-          <p className="text-[11px] text-[#4E5C72] mt-0.5 leading-none">
+          <p className="text-[11px] text-[#6B7A8D] mt-0.5 leading-none">
             Korean Stock Intelligence
           </p>
         </div>
@@ -108,13 +108,13 @@ export function Sidebar({ className }: SidebarProps) {
                       "before:h-5 before:w-[3px] before:rounded-r-full before:bg-[#3182F6]",
                     ].join(" ")
                   : // 비활성: muted 텍스트, hover 시 약한 배경
-                    "text-[#8B96A9] hover:bg-[#161B27]/60 hover:text-[#F0F4FF]"
+                    "text-[#A0AEBF] hover:bg-[#161B27]/60 hover:text-[#F0F4FF]"
               )}
             >
               <Icon
                 className={cn(
                   "w-4 h-4 flex-shrink-0 transition-colors duration-150",
-                  isActive ? "text-[#3182F6]" : "text-[#4E5C72]"
+                  isActive ? "text-[#3182F6]" : "text-[#6B7A8D]"
                 )}
               />
               <span>{item.label}</span>
@@ -125,8 +125,8 @@ export function Sidebar({ className }: SidebarProps) {
 
       {/* 하단 버전 정보 */}
       <div className="px-5 py-4 border-t border-[#242D3D]">
-        <p className="text-[11px] text-[#4E5C72]">KOSPI · KOSDAQ 분석</p>
-        <p className="text-[11px] text-[#4E5C72] mt-0.5">
+        <p className="text-[11px] text-[#6B7A8D]">KOSPI · KOSDAQ 분석</p>
+        <p className="text-[11px] text-[#6B7A8D] mt-0.5">
           v0.1.0 — 개발중
         </p>
       </div>
