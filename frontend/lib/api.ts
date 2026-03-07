@@ -21,6 +21,18 @@ export interface MarketSummary {
   market_phase: string;
   overall_stance: string;
   indicators: Record<string, unknown>;
+  // 글로벌 시장 데이터
+  sp500_price: number;
+  sp500_change: number;
+  nasdaq_price: number;
+  nasdaq_change: number;
+  usd_krw: number;
+  usd_krw_change: number;
+  wti_price: number;
+  wti_change: number;
+  gold_price: number;
+  gold_change: number;
+  us10y_yield: number;
   generated_at: string;
 }
 
@@ -115,28 +127,6 @@ export interface StockPrice {
   generated_at: string;
 }
 
-/** 브리핑 리포트 (GET /api/v1/reports/latest) */
-export interface LatestReport {
-  report_type: string;
-  report_date: string;
-  content: string;
-  file_path: string;
-  file_mtime: string; // 파일 수정 시각 — 폴링 변경 감지용
-}
-
-/** 리포트 목록 항목 */
-export interface ReportListItem {
-  filename: string;
-  type: string;
-  date: string;
-  size_kb: number;
-}
-
-/** 리포트 목록 (GET /api/v1/reports/list) */
-export interface ReportList {
-  reports: ReportListItem[];
-  total: number;
-}
 
 // ─── 공통 fetch 래퍼 ───────────────────────────────────────
 
@@ -192,25 +182,6 @@ export async function fetchTodayStrategy(): Promise<TodayStrategy> {
   return apiFetch<TodayStrategy>("/api/v1/strategy/today");
 }
 
-/**
- * 최신 브리핑 리포트 조회
- * GET /api/v1/reports/latest?report_type={type}
- */
-export async function fetchLatestReport(
-  reportType: "morning" | "open" | "close" | "evening"
-): Promise<LatestReport> {
-  return apiFetch<LatestReport>(
-    `/api/v1/reports/latest?report_type=${reportType}`
-  );
-}
-
-/**
- * 리포트 목록 조회
- * GET /api/v1/reports/list
- */
-export async function fetchReportList(): Promise<ReportList> {
-  return apiFetch<ReportList>("/api/v1/reports/list");
-}
 
 /**
  * 종목 주가 히스토리 조회
@@ -243,28 +214,3 @@ export async function fetchStrategyStatus(): Promise<{ status: string }> {
   return apiFetch<{ status: string }>("/api/v1/strategy/status");
 }
 
-/**
- * 브리핑 태스크 실행 상태 조회
- * GET /api/v1/briefing/status/{type}  → "idle" | "running" | "done" | "failed: ..."
- */
-export async function fetchBriefingStatus(
-  briefingType: string
-): Promise<{ briefing_type: string; status: string }> {
-  return apiFetch(`/api/v1/briefing/status/${briefingType}`);
-}
-
-/**
- * 브리핑 즉시 실행
- * POST /api/v1/briefing/run
- */
-export async function runBriefing(
-  briefingType: "morning" | "open" | "close" | "evening"
-): Promise<{ message: string; task_id?: string }> {
-  return apiFetch<{ message: string; task_id?: string }>(
-    "/api/v1/briefing/run",
-    {
-      method: "POST",
-      body: JSON.stringify({ briefing_type: briefingType }),
-    }
-  );
-}

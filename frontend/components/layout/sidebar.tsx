@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  FileText,
   TrendingUp,
   Search,
   Star,
@@ -18,12 +17,6 @@ export const navItems = [
     label: "대시보드",
     icon: LayoutDashboard,
     description: "시장 현황 요약",
-  },
-  {
-    href: "/reports",
-    label: "브리핑",
-    icon: FileText,
-    description: "모닝/이브닝 리포트",
   },
   {
     href: "/strategy",

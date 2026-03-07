@@ -15,6 +15,9 @@ import {
   Wifi,
   WifiOff,
   Activity,
+  DollarSign,
+  Droplets,
+  CircleDot,
 } from "lucide-react";
 import {
   Card,
@@ -343,6 +346,128 @@ function MarketIndicatorsCard({
 }
 
 /* ────────────────────────────────────────────────────────────
+   글로벌 시장 미니 카드
+   ──────────────────────────────────────────────────────────── */
+function GlobalMiniCard({
+  label,
+  value,
+  change,
+  prefix,
+  decimals = 2,
+  icon: Icon,
+}: {
+  label: string;
+  value: number;
+  change: number;
+  prefix?: string;
+  decimals?: number;
+  icon?: React.ComponentType<{ className?: string }>;
+}) {
+  const isEmpty = value === 0;
+  const colorClass = getChangeColor(change);
+  const TrendIcon =
+    change > 0 ? TrendingUp : change < 0 ? TrendingDown : Minus;
+
+  return (
+    <Card className="p-4 hover:border-[#3182F6]/40 transition-colors duration-200">
+      <div className="flex items-center gap-2 mb-2">
+        {Icon && <Icon className="w-3.5 h-3.5 text-[#6B7A8D]" />}
+        <p className="text-xs font-medium text-[#A0AEBF] uppercase tracking-wide">
+          {label}
+        </p>
+      </div>
+      <CardValue className="text-2xl mb-1">
+        {isEmpty ? "—" : `${prefix ?? ""}${formatNumber(value, decimals)}`}
+      </CardValue>
+      {!isEmpty && (
+        <div className={`flex items-center gap-1 ${colorClass}`}>
+          <TrendIcon className="w-3 h-3 flex-shrink-0" />
+          <span className="text-xs font-semibold tabular-nums">
+            {formatChange(change)}
+          </span>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────
+   글로벌 시장 섹션
+   ──────────────────────────────────────────────────────────── */
+function GlobalMarketSection({
+  data,
+}: {
+  data: {
+    sp500_price: number;
+    sp500_change: number;
+    nasdaq_price: number;
+    nasdaq_change: number;
+    usd_krw: number;
+    usd_krw_change: number;
+    wti_price: number;
+    wti_change: number;
+    gold_price: number;
+    gold_change: number;
+    us10y_yield: number;
+  };
+}) {
+  // 환율 변동은 절대값(원), 등락률로 변환
+  const usdChangePct =
+    data.usd_krw > 0 ? (data.usd_krw_change / data.usd_krw) * 100 : 0;
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-medium text-[#6B7A8D] uppercase tracking-wide px-1">
+        글로벌 시장
+      </p>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <GlobalMiniCard
+          label="S&P 500"
+          value={data.sp500_price}
+          change={data.sp500_change}
+          decimals={0}
+        />
+        <GlobalMiniCard
+          label="NASDAQ"
+          value={data.nasdaq_price}
+          change={data.nasdaq_change}
+          decimals={0}
+        />
+        <GlobalMiniCard
+          label="USD/KRW"
+          value={data.usd_krw}
+          change={usdChangePct}
+          prefix="₩"
+          decimals={0}
+          icon={DollarSign}
+        />
+        <GlobalMiniCard
+          label="WTI"
+          value={data.wti_price}
+          change={data.wti_change}
+          prefix="$"
+          icon={Droplets}
+        />
+        <GlobalMiniCard
+          label="Gold"
+          value={data.gold_price}
+          change={data.gold_change}
+          prefix="$"
+          decimals={0}
+          icon={CircleDot}
+        />
+        <GlobalMiniCard
+          label="US 10Y"
+          value={data.us10y_yield}
+          change={0}
+          decimals={2}
+        />
+      </div>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────
    에러 배너
    ──────────────────────────────────────────────────────────── */
 function ErrorBanner({ message }: { message: string }) {
@@ -371,7 +496,7 @@ export default function DashboardPage() {
             시장 현황
           </h1>
           <p className="text-sm text-[#A0AEBF] mt-0.5">
-            KOSPI · KOSDAQ 실시간 대시보드
+            KOSPI · KOSDAQ · 글로벌 실시간 대시보드
           </p>
         </div>
 
@@ -476,6 +601,9 @@ export default function DashboardPage() {
               />
             </div>
           </div>
+
+          {/* ── 글로벌 시장 ── */}
+          <GlobalMarketSection data={data} />
 
           {/* ── 2행: 외국인 / 기관 수급 카드 ── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

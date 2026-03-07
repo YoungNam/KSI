@@ -1,12 +1,12 @@
 """
 API v1 라우터 — KSI 핵심 엔드포인트
 
-GET /market/summary    → 시장 분석 (KOSPI·KOSDAQ + 기술 지표)
-GET /stocks/featured   → 특징주 스캔 결과
-GET /strategy/today    → 오늘의 투자 전략 JSON
-GET /reports/latest    → 최근 브리핑 리포트 (Markdown)
-GET /reports/{type}    → 특정 유형 브리핑 리포트
-POST /briefing/run     → 수동 브리핑 즉시 실행
+GET /market/summary      → 시장 분석 (KOSPI·KOSDAQ + 글로벌 시장)
+GET /stocks/featured     → 특징주 스캔 결과
+GET /stocks/{ticker}/price → 개별 종목 주가 히스토리
+GET /strategy/today      → 오늘의 투자 전략 JSON
+POST /strategy/generate  → 전략 즉시 생성
+GET /strategy/status     → 전략 생성 상태
 """
 import asyncio
 import json
@@ -32,11 +32,6 @@ def _run_sync(fn, *args, **kwargs):
     return loop.run_in_executor(None, lambda: fn(*args, **kwargs))
 
 
-def _latest_report_path(report_type: str) -> Optional[Path]:
-    """reports/ 에서 {type}_*.md 중 가장 최신 파일 반환"""
-    files = sorted(REPORTS_DIR.glob(f"{report_type}_*.md"), reverse=True)
-    return files[0] if files else None
-
 
 def _latest_strategy_path() -> Optional[Path]:
     files = sorted(REPORTS_DIR.glob("strategy_*.json"), reverse=True)
@@ -60,6 +55,18 @@ class MarketSummaryResponse(BaseModel):
     market_phase:   str
     overall_stance: str
     indicators:     dict
+    # 글로벌 시장 데이터
+    sp500_price:    float = 0.0
+    sp500_change:   float = 0.0
+    nasdaq_price:   float = 0.0
+    nasdaq_change:  float = 0.0
+    usd_krw:        float = 0.0
+    usd_krw_change: float = 0.0
+    wti_price:      float = 0.0
+    wti_change:     float = 0.0
+    gold_price:     float = 0.0
+    gold_change:    float = 0.0
+    us10y_yield:    float = 0.0
     generated_at:   str
 
 
@@ -79,21 +86,6 @@ class FeaturedStocksResponse(BaseModel):
     generated_at: str
 
 
-class ReportResponse(BaseModel):
-    report_type: str
-    report_date: str
-    content:     str   # Markdown 원문
-    file_path:   str
-    file_mtime:  str   # 파일 수정 시각 ISO 문자열 — 폴링 변경 감지용
-
-
-class BriefingRunRequest(BaseModel):
-    briefing_type: str  # "morning" | "open" | "close" | "evening"
-
-
-# 실행 중인 브리핑 태스크 상태 추적 {type: "running"|"done"|"failed"}
-_briefing_status: dict[str, str] = {}
-
 
 # ────────────────────────────────────────────────
 # 엔드포인트
@@ -110,6 +102,8 @@ async def get_market_summary():
         analysis = await _run_sync(analyze_market)
         k = analysis.korean_market
 
+        g = analysis.global_market
+
         return MarketSummaryResponse(
             kospi_index=k.kospi_index,
             kospi_change=k.kospi_change,
@@ -123,6 +117,17 @@ async def get_market_summary():
             market_phase=analysis.market_phase,
             overall_stance=analysis.overall_stance,
             indicators=analysis.indicators,
+            sp500_price=g.sp500_price,
+            sp500_change=g.sp500_change,
+            nasdaq_price=g.nasdaq_price,
+            nasdaq_change=g.nasdaq_change,
+            usd_krw=g.usd_krw,
+            usd_krw_change=g.usd_krw_change,
+            wti_price=g.wti_price,
+            wti_change=g.wti_change,
+            gold_price=g.gold_price,
+            gold_change=g.gold_change,
+            us10y_yield=g.us10y_yield,
             generated_at=datetime.now().isoformat(),
         )
     except Exception as e:
@@ -246,56 +251,6 @@ async def get_strategy_status():
     return {"status": _strategy_status.get("status", "idle")}
 
 
-@router.get("/reports/latest", response_model=ReportResponse)
-async def get_latest_report(
-    report_type: str = Query(default="morning", description="morning | open | close | evening"),
-):
-    """
-    가장 최근의 지정 유형 브리핑 Markdown 반환.
-    """
-    allowed = {"morning", "open", "close", "evening"}
-    if report_type not in allowed:
-        raise HTTPException(status_code=400, detail=f"report_type은 {allowed} 중 하나여야 합니다.")
-
-    path = _latest_report_path(report_type)
-    if path is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"'{report_type}' 브리핑 파일이 없습니다.",
-        )
-
-    content = path.read_text(encoding="utf-8")
-    # 파일명에서 날짜 추출: morning_2026-03-07.md → 2026-03-07
-    report_date = path.stem.split("_", 1)[-1]
-    # 파일 수정 시각 (폴링 변경 감지용)
-    file_mtime = datetime.fromtimestamp(path.stat().st_mtime).isoformat()
-
-    return ReportResponse(
-        report_type=report_type,
-        report_date=report_date,
-        content=content,
-        file_path=str(path),
-        file_mtime=file_mtime,
-    )
-
-
-@router.get("/reports/list")
-async def list_reports():
-    """저장된 모든 브리핑 파일 목록 반환"""
-    files = sorted(REPORTS_DIR.glob("*.md"), reverse=True)
-    return {
-        "reports": [
-            {
-                "filename": f.name,
-                "type": f.stem.split("_")[0],
-                "date": f.stem.split("_", 1)[-1],
-                "size_kb": round(f.stat().st_size / 1024, 1),
-            }
-            for f in files
-        ],
-        "total": len(files),
-    }
-
 
 @router.get("/stocks/{ticker}/price")
 async def get_stock_price(
@@ -366,59 +321,3 @@ async def get_stock_price(
         raise HTTPException(status_code=500, detail=f"주가 조회 실패: {str(e)}")
 
 
-@router.get("/briefing/status/{briefing_type}")
-async def get_briefing_status(briefing_type: str):
-    """브리핑 태스크 실행 상태 조회 (running | done | failed | idle)"""
-    status = _briefing_status.get(briefing_type, "idle")
-    return {"briefing_type": briefing_type, "status": status}
-
-
-@router.post("/briefing/run")
-async def run_briefing_now(
-    req: BriefingRunRequest,
-    background_tasks: BackgroundTasks,
-):
-    """
-    수동으로 브리핑을 즉시 실행 (백그라운드 태스크).
-    실행 상태는 GET /briefing/status/{type} 으로 폴링.
-    """
-    type_map = {
-        "morning": "ntx_morning_briefing",
-        "open":    "market_open_update",
-        "close":   "market_close_report",
-        "evening": "ntx_evening_briefing",
-    }
-    fn_name = type_map.get(req.briefing_type)
-    if fn_name is None:
-        raise HTTPException(
-            status_code=400,
-            detail=f"briefing_type은 {list(type_map.keys())} 중 하나여야 합니다.",
-        )
-
-    from scheduler import tasks as task_module
-    fn = getattr(task_module, fn_name)
-    btype = req.briefing_type
-
-    # 실행 상태를 추적하는 래퍼
-    def _run_with_status():
-        _briefing_status[btype] = "running"
-        try:
-            fn()
-            _briefing_status[btype] = "done"
-        except Exception as e:
-            _briefing_status[btype] = f"failed: {str(e)[:120]}"
-            print(f"[briefing/run] {btype} 실패: {e}")
-
-    background_tasks.add_task(_run_with_status)
-
-    return {
-        "message": f"'{req.briefing_type}' 브리핑 실행이 백그라운드에서 시작됐습니다.",
-        "briefing_type": req.briefing_type,
-        "started_at": datetime.now().isoformat(),
-    }
-
-
-
-# NOTE: /debug/pykrx 엔드포인트 제거됨 (2026-03-07)
-# pykrx 1.2.4에서 get_index_ohlcv, get_market_ohlcv, get_market_trading_value_by_date 모두
-# KRX API 응답 변경으로 실패. get_market_ticker_name만 작동 확인됨.
