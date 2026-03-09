@@ -1,5 +1,10 @@
 """
-market_data.py — FinanceDataReader 기반 시장 데이터 수집 (pykrx fallback)
+market_data.py — 시장 데이터 수집
+
+데이터 소스:
+  - KRX Open API  : 거래대금 (AUTH_KEY 인증)
+  - KRX 스크래핑   : 외국인·기관 순매수 (인증 불필요)
+  - FDR (Yahoo)    : 지수 종가·등락률, 글로벌 시장
 
 함수:
   fetch_korean_market()  → KoreanMarket
@@ -10,6 +15,8 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timedelta
+
+import requests
 
 from models import GlobalMarket, KoreanMarket
 
@@ -105,19 +112,112 @@ def _fmt_volume(value: float) -> str:
     return f"{value / 1e8:,.0f}억"
 
 
-def _recent_trading_date(days_back: int = 5) -> tuple[str, str]:
-    """최근 N일 전 ~ 오늘 날짜 문자열 반환 (YYYYMMDD)"""
+def _latest_trading_date() -> str:
+    """최근 거래일 (YYYYMMDD) — 주말·공휴일이면 직전 평일 반환"""
     today = datetime.today()
-    start = today - timedelta(days=days_back)
-    return start.strftime("%Y%m%d"), today.strftime("%Y%m%d")
+    # 장 마감 전이면 전일 데이터 사용
+    if today.hour < 16:
+        today = today - timedelta(days=1)
+    # 주말 보정
+    while today.weekday() >= 5:  # 5=토, 6=일
+        today = today - timedelta(days=1)
+    return today.strftime("%Y%m%d")
 
 
 # ────────────────────────────────────────────────
-# 국내 시장 데이터
+# KRX Open API — 거래대금 수집
+# ────────────────────────────────────────────────
+
+def _fetch_krx_volume(date: str) -> tuple[str, str]:
+    """KRX Open API로 KOSPI·KOSDAQ 거래대금 수집. 실패 시 ("—", "—") 반환."""
+    krx_key = os.getenv("KRX_API_KEY", "")
+    if not krx_key:
+        return "—", "—"
+
+    kospi_vol = "—"
+    kosdaq_vol = "—"
+
+    endpoints = [
+        ("idx/kospi_dd_trd", "코스피"),
+        ("idx/kosdaq_dd_trd", "코스닥"),
+    ]
+    try:
+        for endpoint, idx_keyword in endpoints:
+            url = f"https://data-dbg.krx.co.kr/svc/apis/{endpoint}"
+            r = requests.get(
+                url,
+                headers={"AUTH_KEY": krx_key.strip()},
+                params={"basDd": date},
+                timeout=10,
+            )
+            if r.status_code != 200:
+                print(f"[market_data] KRX API {endpoint} HTTP {r.status_code}")
+                continue
+
+            items = r.json().get("OutBlock_1", [])
+            # 전체 시장 거래대금 = 첫 번째 항목 (외국주포함 전체)
+            total_val = 0.0
+            if items:
+                total_val = float(items[0].get("ACC_TRDVAL", 0))
+
+            if "kospi" in endpoint:
+                kospi_vol = _fmt_volume(total_val) if total_val > 0 else "—"
+            else:
+                kosdaq_vol = _fmt_volume(total_val) if total_val > 0 else "—"
+
+        print(f"[market_data] KRX 거래대금: KOSPI={kospi_vol}, KOSDAQ={kosdaq_vol}")
+    except Exception as e:
+        print(f"[market_data] KRX Open API 거래대금 실패: {e}")
+
+    return kospi_vol, kosdaq_vol
+
+
+# ────────────────────────────────────────────────
+# 네이버 금융 API — 외국인·기관 순매수
+# ────────────────────────────────────────────────
+
+def _fetch_investor_trading(date: str) -> tuple[str, str]:
+    """네이버 금융 API로 KOSPI 외국인·기관 순매수 수집. 실패 시 ("—", "—") 반환.
+
+    네이버 응답 단위: 억 원 (부호 포함 문자열, e.g. "+32,534", "-20,826")
+    """
+    foreign_net = "—"
+    inst_net = "—"
+
+    try:
+        r = requests.get(
+            "https://m.stock.naver.com/api/index/KOSPI/trend",
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=10,
+        )
+        if r.status_code != 200:
+            print(f"[market_data] 네이버 수급 API HTTP {r.status_code}")
+            return foreign_net, inst_net
+
+        data = r.json()
+        # 응답: {"bizdate":"20260309", "personalValue":"+32,534",
+        #        "foreignValue":"-20,826", "institutionalValue":"-12,224"}
+        fv = data.get("foreignValue", "")
+        iv = data.get("institutionalValue", "")
+
+        if fv:
+            foreign_net = f"{fv}억"
+        if iv:
+            inst_net = f"{iv}억"
+
+        print(f"[market_data] 수급(네이버): 외국인={foreign_net}, 기관={inst_net}")
+    except Exception as e:
+        print(f"[market_data] 네이버 수급 수집 실패: {e}")
+
+    return foreign_net, inst_net
+
+
+# ────────────────────────────────────────────────
+# 국내 시장 데이터 (통합)
 # ────────────────────────────────────────────────
 
 def fetch_korean_market() -> KoreanMarket:
-    """KOSPI·KOSDAQ 지수 및 외국인·기관 수급 수집 (FDR 우선, pykrx fallback)"""
+    """KOSPI·KOSDAQ 지수 + 거래대금 + 외국인·기관 수급 수집"""
     try:
         import FinanceDataReader as fdr
 
@@ -141,12 +241,12 @@ def fetch_korean_market() -> KoreanMarket:
         kospi_chg  = (float(kospi_latest["Close"])  - kospi_prev)  / kospi_prev  * 100
         kosdaq_chg = (float(kosdaq_latest["Close"]) - kosdaq_prev) / kosdaq_prev * 100
 
-        # 거래대금·수급 — pykrx KRX API 호환 문제로 현재 미제공
-        # TODO: KRX Open API 또는 pykrx 호환 버전 나오면 복구
-        kospi_vol = "—"
-        kosdaq_vol = "—"
-        foreign_net = "—"
-        inst_net = "—"
+        # 거래대금 — KRX Open API
+        trade_date = _latest_trading_date()
+        kospi_vol, kosdaq_vol = _fetch_krx_volume(trade_date)
+
+        # 외국인·기관 순매수 — KRX 스크래핑
+        foreign_net, inst_net = _fetch_investor_trading(trade_date)
 
         return KoreanMarket(
             kospi_index=float(kospi_latest["Close"]),
