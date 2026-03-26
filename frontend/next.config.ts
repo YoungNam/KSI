@@ -5,10 +5,17 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   // 백엔드 API 프록시 설정 (개발 환경)
   async rewrites() {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+    if (!apiUrl) return [];
+
+    const destination = apiUrl.startsWith('http')
+      ? `${apiUrl}/api/:path*`
+      : `https://${apiUrl}/api/:path*`;
+
     return [
       {
-        source: "/api/backend/:path*",
-        destination: `${process.env.NEXT_PUBLIC_API_URL}/api/:path*`,
+        source: '/api/backend/:path*',
+        destination,
       },
     ];
   },
